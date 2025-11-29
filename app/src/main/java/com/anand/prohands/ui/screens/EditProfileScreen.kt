@@ -26,7 +26,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-import com.anand.prohands.data.ClientProfileDto
 import com.anand.prohands.viewmodel.AuthViewModel
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -138,14 +137,15 @@ fun EditProfileScreen(
         ) {
             // Profile Picture Upload
             Box(contentAlignment = Alignment.BottomEnd) {
-                // Use state.profile?.profilePictureUrl directly to react to updates
-                val imageUrl = state.profile?.profilePictureUrl ?: "https://via.placeholder.com/150"
+                // Force reload by appending timestamp
+                val imageUrl = remember(state.profile?.profilePictureUrl, state.uploadSuccess) {
+                    val url = state.profile?.profilePictureUrl ?: "https://via.placeholder.com/150"
+                    if (url.contains("?")) "$url&t=${System.currentTimeMillis()}" else "$url?t=${System.currentTimeMillis()}"
+                }
                 
                 Image(
                     painter = rememberAsyncImagePainter(
                         model = imageUrl
-                        // Adding a key or cache policy might be needed if URL stays same but content changes, 
-                        // but usually backend returns new URL or Coil handles it.
                     ),
                     contentDescription = "Profile Picture",
                     modifier = Modifier
