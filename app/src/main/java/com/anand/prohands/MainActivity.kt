@@ -12,6 +12,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.anand.prohands.network.RetrofitClient
 import com.anand.prohands.ui.screens.EditProfileScreen
 import com.anand.prohands.ui.screens.ForgotPasswordScreen
 import com.anand.prohands.ui.screens.LoginScreen
@@ -21,12 +22,24 @@ import com.anand.prohands.ui.screens.SignUpScreen
 import com.anand.prohands.ui.screens.VerifyAccountScreen
 import com.anand.prohands.ui.screens.VerifyMfaScreen
 import com.anand.prohands.ui.theme.ProHandsTheme
+import com.anand.prohands.utils.SessionManager
 import com.anand.prohands.viewmodel.AuthViewModel
+import com.anand.prohands.viewmodel.AuthViewModelFactory
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // Initialize RetrofitClient with Context
+        RetrofitClient.init(applicationContext)
+
+        // Create SessionManager
+        val sessionManager = SessionManager(applicationContext)
+
+        // Create Factory
+        val viewModelFactory = AuthViewModelFactory(sessionManager)
+
         setContent {
             ProHandsTheme {
                 Surface(
@@ -34,10 +47,13 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    // Create the ViewModel at the Activity level to share it across screens
-                    val authViewModel: AuthViewModel = viewModel()
+                    // Create the ViewModel using the factory
+                    val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
                     
-                    NavHost(navController = navController, startDestination = "login") {
+                    // Check if we should start at "profile" instead of "login"
+                    val startDest = if (authViewModel.state.value.loginSuccess) "profile" else "login"
+
+                    NavHost(navController = navController, startDestination = startDest) {
                         composable("login") {
                             LoginScreen(
                                 viewModel = authViewModel,

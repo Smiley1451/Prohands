@@ -6,15 +6,14 @@ import retrofit2.Response
 import retrofit2.http.*
 
 interface ProfileApi {
+    // Removed @Header("Authorization") because AuthInterceptor handles it now
     @GET("api/clients/{userId}")
     suspend fun getProfile(
-        @Header("Authorization") token: String,
         @Path("userId") userId: String
     ): Response<ClientProfileDto>
 
     @PUT("api/clients/{userId}")
     suspend fun updateProfile(
-        @Header("Authorization") token: String,
         @Path("userId") userId: String,
         @Body profile: ClientProfileDto
     ): Response<ClientProfileDto>
@@ -22,14 +21,12 @@ interface ProfileApi {
     @Multipart
     @POST("api/clients/{userId}/picture")
     suspend fun uploadProfilePicture(
-        @Header("Authorization") token: String,
         @Path("userId") userId: String,
         @Part file: MultipartBody.Part
     ): Response<ClientProfileDto>
-
+    
     @GET("api/clients")
     suspend fun searchProfiles(
-        @Header("Authorization") token: String,
         @Query("skill") skill: String?,
         @Query("minRating") minRating: Double?
     ): Response<List<ClientProfileDto>>

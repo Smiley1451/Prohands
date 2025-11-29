@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anand.prohands.data.*
 import com.anand.prohands.network.RetrofitClient
+import com.anand.prohands.utils.SessionManager
 import kotlinx.coroutines.launch
 import okhttp3.MultipartBody
 import retrofit2.HttpException
@@ -28,7 +29,7 @@ data class AuthState(
     val uploadSuccess: Boolean = false
 )
 
-class AuthViewModel : ViewModel() {
+class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
     private val _state = mutableStateOf(AuthState())
     val state: State<AuthState> = _state
 
@@ -47,6 +48,18 @@ class AuthViewModel : ViewModel() {
         "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,128}$"
     )
 
+    init {
+        val savedUserId = sessionManager.getUserId()
+        val savedToken = sessionManager.getAuthToken()
+        if (savedUserId != null && savedToken != null) {
+            _state.value = _state.value.copy(
+                loginSuccess = true,
+                userId = savedUserId
+            )
+            fetchProfile() // Automatically fetch profile if user is already logged in
+        }
+    }
+
     fun login(email: String, password: String) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, loginSuccess = false, mfaRequired = false)
@@ -58,6 +71,9 @@ class AuthViewModel : ViewModel() {
                         _state.value = _state.value.copy(isLoading = false, mfaRequired = true, emailForVerification = email)
                     } else {
                         // Store tokens and userId
+                        sessionManager.saveAuthToken(body.token)
+                        sessionManager.saveUserId(body.userId)
+
                         _state.value = _state.value.copy(
                             isLoading = false, 
                             loginSuccess = true,
@@ -82,6 +98,10 @@ class AuthViewModel : ViewModel() {
                 val response = RetrofitClient.authService.verifyMfa(MfaRequest(email, otp))
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
+
+                    sessionManager.saveAuthToken(body.token)
+                    sessionManager.saveUserId(body.userId)
+
                     _state.value = _state.value.copy(
                         isLoading = false, 
                         loginSuccess = true,
@@ -194,9 +214,10 @@ class AuthViewModel : ViewModel() {
     }
     
     fun fetchProfile() {
-        val userId = _state.value.userId
+        val userId = _state.value.userId ?: sessionManager.getUserId()
+        
         if (userId == null) {
-            _state.value = _state.value.copy(error = "User ID is missing. Please login again.")
+            _state.value = _state.value.copy(error = "User ID is missing.")
             return
         }
         
@@ -204,9 +225,13 @@ class AuthViewModel : ViewModel() {
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
                 // Pass userId to getProfile
-                val response = RetrofitClient.profileApi.getProfile("Bearer ", userId) 
+                val response = RetrofitClient.profileApi.getProfile(userId) 
                 if (response.isSuccessful && response.body() != null) {
                     _state.value = _state.value.copy(isLoading = false, profile = response.body())
+                } else if (response.code() == 401 || response.code() == 403) {
+                     // Handle session expiry
+                     sessionManager.clearSession()
+                     _state.value = _state.value.copy(loginSuccess = false, error = "Session expired")
                 } else {
                      val errorMsg = parseError(response)
                     _state.value = _state.value.copy(isLoading = false, error = errorMsg)
@@ -222,7 +247,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, updateSuccess = false)
             try {
-                val response = RetrofitClient.profileApi.updateProfile("Bearer ", userId, updatedProfile)
+                val response = RetrofitClient.profileApi.updateProfile(userId, updatedProfile)
                 if (response.isSuccessful && response.body() != null) {
                     _state.value = _state.value.copy(isLoading = false, profile = response.body(), updateSuccess = true)
                 } else {
@@ -240,7 +265,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, uploadSuccess = false)
             try {
-                val response = RetrofitClient.profileApi.uploadProfilePicture("Bearer ", userId, file)
+                val response = RetrofitClient.profileApi.uploadProfilePicture(userId, file)
                 if (response.isSuccessful && response.body() != null) {
                     _state.value = _state.value.copy(isLoading = false, profile = response.body(), uploadSuccess = true)
                 } else {
