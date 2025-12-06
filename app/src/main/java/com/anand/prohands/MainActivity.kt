@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -47,6 +49,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     val navController = rememberNavController()
                     val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
+                    val authState by authViewModel.state.collectAsState()
 
                     val startDestination = if (sessionManager.getAuthToken() != null) "main" else "login"
 
@@ -100,7 +103,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("main") {
-                            MainScreen()
+                            MainScreen(authState = authState)
                         }
                     }
                 }
