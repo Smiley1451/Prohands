@@ -26,6 +26,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
+import com.anand.prohands.ui.theme.* // Import theme colors
 import com.anand.prohands.viewmodel.AuthViewModel
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -39,8 +40,8 @@ fun EditProfileScreen(
     viewModel: AuthViewModel,
     onNavigateBack: () -> Unit
 ) {
-    val state = viewModel.state.value
-    val profile = state.profile ?: return // Or show loading/error
+    val state by viewModel.state.collectAsState()
+    val profile = state.profile ?: return
 
     var name by remember { mutableStateOf(profile.name ?: "") }
     var phone by remember { mutableStateOf(profile.phone ?: "") }
@@ -51,7 +52,6 @@ fun EditProfileScreen(
     val context = LocalContext.current
     val scrollState = rememberScrollState()
 
-    // Image Picker
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
@@ -69,24 +69,21 @@ fun EditProfileScreen(
         }
     }
 
-    // Handle Update Success
     LaunchedEffect(state.updateSuccess) {
         if (state.updateSuccess) {
             Toast.makeText(context, "Profile updated successfully!", Toast.LENGTH_SHORT).show()
-            viewModel.clearStatusFlags() // Clear flags to prevent re-triggering
+            viewModel.clearStatusFlags()
             onNavigateBack()
         }
     }
 
-    // Handle Upload Success
     LaunchedEffect(state.uploadSuccess) {
         if (state.uploadSuccess) {
             Toast.makeText(context, "Profile picture updated!", Toast.LENGTH_SHORT).show()
-            viewModel.clearStatusFlags() // Clear flags
+            viewModel.clearStatusFlags()
         }
     }
 
-    // Handle Errors
     LaunchedEffect(state.error) {
         state.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
@@ -135,9 +132,7 @@ fun EditProfileScreen(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profile Picture Upload
             Box(contentAlignment = Alignment.BottomEnd) {
-                // Force reload by appending timestamp
                 val imageUrl = remember(state.profile?.profilePictureUrl, state.uploadSuccess) {
                     val url = state.profile?.profilePictureUrl ?: "https://via.placeholder.com/150"
                     if (url.contains("?")) "$url&t=${System.currentTimeMillis()}" else "$url?t=${System.currentTimeMillis()}"

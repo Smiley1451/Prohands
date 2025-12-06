@@ -20,6 +20,7 @@ data class ClientProfileDto(
     @SerializedName("totalReviews") val totalReviews: Int = 0,
     @SerializedName("latitude") val latitude: Double?,
     @SerializedName("longitude") val longitude: Double?,
+    @SerializedName("lastAiUpdate") val lastAiUpdate: String?, // Added field
     @SerializedName("createdAt") val createdAt: String?,
     @SerializedName("profileCompletionPercent") val profileCompletionPercent: Int = 0
 )

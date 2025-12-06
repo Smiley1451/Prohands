@@ -1,50 +1,68 @@
 package com.anand.prohands.network
 
 import android.content.Context
+import com.anand.prohands.BuildConfig
 import com.anand.prohands.utils.SessionManager
+import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
+import okhttp3.logging.HttpLoggingInterceptor
+import okhttp3.logging.HttpLoggingInterceptor.Level
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val AUTH_BASE_URL = "https://unsufferably-heimish-tashina.ngrok-free.dev/"
-    private const val PROFILE_BASE_URL = "https://picks-situation-images-undefined.trycloudflare.com/"
+    private const val BASE_URL = "https://unsufferably-heimish-tashina.ngrok-free.dev/"
 
-    // Hold a reference to SessionManager
+    // NOTE: You must replace this with your actual production host and SHA-256 pin
+    private const val CERT_HOST = "unsufferably-heimish-tashina.ngrok-free.dev"
+    private const val CERT_PIN_PLACEHOLDER = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+
     private lateinit var sessionManager: SessionManager
 
-    // Initialize this in MainActivity
     fun init(context: Context) {
         sessionManager = SessionManager(context)
     }
 
     private val okHttpClient: OkHttpClient by lazy {
-        OkHttpClient.Builder()
-            .addInterceptor(AuthInterceptor(sessionManager)) // Add the interceptor here
-            .build()
+        val clientBuilder = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .addInterceptor(AuthInterceptor(sessionManager))
+
+        if (BuildConfig.DEBUG) {
+            val logging = HttpLoggingInterceptor().apply {
+                level = Level.BODY
+            }
+            clientBuilder.addInterceptor(logging)
+        } else {
+            val certificatePinner = CertificatePinner.Builder()
+                .add(CERT_HOST, CERT_PIN_PLACEHOLDER)
+                .build()
+            clientBuilder.certificatePinner(certificatePinner)
+        }
+
+        clientBuilder.build()
     }
 
-    private val authRetrofit: Retrofit by lazy {
+    private val retrofit: Retrofit by lazy {
         Retrofit.Builder()
-            .baseUrl(AUTH_BASE_URL)
-            .client(okHttpClient) // Use the custom client
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-    }
-
-    private val profileRetrofit: Retrofit by lazy {
-        Retrofit.Builder()
-            .baseUrl(PROFILE_BASE_URL)
-            .client(okHttpClient) // Use the custom client
+            .baseUrl(BASE_URL)
+            .client(okHttpClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()
     }
 
     val authService: AuthApi by lazy {
-        authRetrofit.create(AuthApi::class.java)
+        retrofit.create(AuthApi::class.java)
     }
 
     val profileApi: ProfileApi by lazy {
-        profileRetrofit.create(ProfileApi::class.java)
+        retrofit.create(ProfileApi::class.java)
+    }
+
+    val jobService: JobService by lazy {
+        retrofit.create(JobService::class.java)
     }
 }

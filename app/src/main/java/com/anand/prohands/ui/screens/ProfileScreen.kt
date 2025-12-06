@@ -22,36 +22,53 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.anand.prohands.data.ClientProfileDto
-
-// --- Theme Colors ---
-val RoyalBlue = Color(0xFF241468) // Trust, Professionalism
-val LightBlueAccent = Color(0xFFE8EAF6) // Background/Subtle
-val Gold = Color(0xFFFFD700) // Accent/Rating
-val SuccessGreen = Color(0xFF4CAF50)
-val SurfaceWhite = Color(0xFFF5F7FA) // Off-white background
+import com.anand.prohands.ui.theme.* // Import all theme colors
+import com.anand.prohands.viewmodel.AuthState
 
 @Composable
 fun ProfileScreen(
-    profile: ClientProfileDto,
+    authState: AuthState,
     onEditProfile: () -> Unit = {},
-    onRefresh: () -> Unit = {}
+    onRefresh: () -> Unit = {},
+    onLogout: () -> Unit = {}
 ) {
-    Box(modifier = Modifier.fillMaxSize().background(SurfaceWhite)) {
-        LazyColumn(
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 80.dp) // Space for sticky footer
-        ) {
-            item { HeroHeader(profile) }
-            item { AiInsightCard(profile) }
-            item { SkillsSection(profile) }
-            item { TrustMetricsGrid(profile) }
-            item { Spacer(modifier = Modifier.height(24.dp)) }
+    Box(
+        modifier = Modifier.fillMaxSize().background(SurfaceWhite),
+        contentAlignment = Alignment.Center
+    ) {
+        when {
+            authState.isLoading -> {
+                CircularProgressIndicator()
+            }
+            authState.error != null -> {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text("Error: ${authState.error}", color = Color.Red)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(onClick = onRefresh) {
+                        Text("Retry")
+                    }
+                }
+            }
+            authState.profile != null -> {
+                val profile = authState.profile
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    item { HeroHeader(profile) }
+                    item { AiInsightCard(profile) }
+                    item { SkillsSection(profile) }
+                    item { TrustMetricsGrid(profile) }
+                    item { Spacer(modifier = Modifier.height(24.dp)) }
+                }
+                StickyFooter(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    onEditProfile = onEditProfile,
+                    onRefresh = onRefresh,
+                    onLogout = onLogout
+                )
+            }
         }
-        StickyFooter(
-            modifier = Modifier.align(Alignment.BottomCenter),
-            onEditProfile = onEditProfile,
-            onRefresh = onRefresh
-        )
     }
 }
 
@@ -62,7 +79,6 @@ fun HeroHeader(profile: ClientProfileDto) {
             .fillMaxWidth()
             .height(280.dp)
     ) {
-        // Gradient Background
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -80,10 +96,12 @@ fun HeroHeader(profile: ClientProfileDto) {
                 .padding(top = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Profile Image with Verification Ring
             Box(contentAlignment = Alignment.Center) {
                 AsyncImage(
-                    model = profile.profilePictureUrl ?: "https://via.placeholder.com/150",
+                    model = profile.profilePictureUrl?.let { url ->
+                        url.replace("http://", "https://")
+                           .replace(".heic", ".jpg")
+                    } ?: "https://via.placeholder.com/150",
                     contentDescription = "Profile Picture",
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
@@ -99,7 +117,6 @@ fun HeroHeader(profile: ClientProfileDto) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Name & Badge
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = profile.name ?: "User",
@@ -124,7 +141,6 @@ fun HeroHeader(profile: ClientProfileDto) {
             )
         }
 
-        // Floating Stats Card
         Card(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -142,7 +158,6 @@ fun HeroHeader(profile: ClientProfileDto) {
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Rating
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(text = "${profile.averageRating}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -150,10 +165,8 @@ fun HeroHeader(profile: ClientProfileDto) {
                     }
                     Text("Rating", fontSize = 12.sp, color = Color.Gray)
                 }
-                // Replaced HorizontalDivider with Box
                 Box(modifier = Modifier.height(24.dp).width(1.dp).background(Color.LightGray))
                 
-                // Success Rate
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(contentAlignment = Alignment.Center) {
                         CircularProgressIndicator(
@@ -167,10 +180,8 @@ fun HeroHeader(profile: ClientProfileDto) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("Success", fontSize = 12.sp, color = Color.Gray)
                 }
-                 // Replaced HorizontalDivider with Box
                  Box(modifier = Modifier.height(24.dp).width(1.dp).background(Color.LightGray))
 
-                // Wage
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(text = "$${profile.recommendedWagePerHour?.toInt() ?: 0}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
                     Text("/hr", fontSize = 12.sp, color = Color.Gray)
@@ -186,7 +197,7 @@ fun AiInsightCard(profile: ClientProfileDto) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(start = 16.dp, end = 16.dp, top = 40.dp, bottom = 16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)), // Very light blue
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -203,7 +214,6 @@ fun AiInsightCard(profile: ClientProfileDto) {
                 lineHeight = 20.sp
             )
             Spacer(modifier = Modifier.height(12.dp))
-            // Top Review Keywords
             val keywords = profile.topReviewKeywords
             if (!keywords.isNullOrEmpty()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -264,14 +274,12 @@ fun TrustMetricsGrid(profile: ClientProfileDto) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Card 1: Profile Strength
             InfoCard(
                 modifier = Modifier.weight(1f),
                 title = "Profile Strength",
                 value = "${profile.profileStrengthScore ?: 0}/100",
                 icon = Icons.Default.Shield
             )
-             // Card 2: Total Reviews
             InfoCard(
                 modifier = Modifier.weight(1f),
                 title = "Total Jobs",
@@ -284,19 +292,17 @@ fun TrustMetricsGrid(profile: ClientProfileDto) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Card 3: Location
             InfoCard(
                 modifier = Modifier.weight(1f),
                 title = "Location",
-                value = "Live Map", // Placeholder for interactive map link
+                value = "Live Map",
                 icon = Icons.Default.LocationOn,
                 isAction = true
             )
-             // Card 4: Joined
             InfoCard(
                 modifier = Modifier.weight(1f),
                 title = "Member Since",
-                value = profile.createdAt?.take(4) ?: "N/A", // Just the year
+                value = profile.createdAt?.take(4) ?: "N/A",
                 icon = Icons.Default.CalendarMonth
             )
         }
@@ -332,7 +338,8 @@ fun InfoCard(
 fun StickyFooter(
     modifier: Modifier = Modifier,
     onEditProfile: () -> Unit,
-    onRefresh: () -> Unit
+    onRefresh: () -> Unit,
+    onLogout: () -> Unit
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -343,7 +350,8 @@ fun StickyFooter(
             modifier = Modifier
                 .padding(16.dp)
                 .fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Button(
                 onClick = onEditProfile,
@@ -359,25 +367,27 @@ fun StickyFooter(
              OutlinedButton(
                 onClick = onRefresh,
                 modifier = Modifier
-                    .width(48.dp) // Square icon button
-                    .height(48.dp),
+                    .size(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 border = BorderStroke(1.dp, RoyalBlue),
                 contentPadding = PaddingValues(0.dp) 
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = RoyalBlue)
             }
+
+            IconButton(onClick = onLogout) {
+                Icon(Icons.Default.Logout, contentDescription = "Logout", tint = RoyalBlue)
+            }
         }
     }
 }
 
-// --- Preview Data ---
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
     val dummyProfile = ClientProfileDto(
         userId = "anand1234",
-        name = "Anand Jaiswal",
+        name = "Anand J",
         email = "anand@example.com",
         phone = "1234567890",
         profilePictureUrl = null,
@@ -394,7 +404,10 @@ fun ProfileScreenPreview() {
         latitude = 0.0,
         longitude = 0.0,
         createdAt = "2023-01-15",
+        lastAiUpdate = "2023-10-27",
         profileCompletionPercent = 100
     )
-    ProfileScreen(profile = dummyProfile)
+    ProHandsTheme {
+        ProfileScreen(authState = AuthState(profile = dummyProfile))
+    }
 }

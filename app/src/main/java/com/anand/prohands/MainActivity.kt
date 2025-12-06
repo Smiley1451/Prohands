@@ -13,10 +13,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.anand.prohands.network.RetrofitClient
-import com.anand.prohands.ui.screens.EditProfileScreen
 import com.anand.prohands.ui.screens.ForgotPasswordScreen
 import com.anand.prohands.ui.screens.LoginScreen
-import com.anand.prohands.ui.screens.ProfileScreen
+import com.anand.prohands.ui.screens.MainScreen
 import com.anand.prohands.ui.screens.ResetPasswordScreen
 import com.anand.prohands.ui.screens.SignUpScreen
 import com.anand.prohands.ui.screens.VerifyAccountScreen
@@ -47,13 +46,11 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
-                    // Create the ViewModel using the factory
                     val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
-                    
-                    // Check if we should start at "profile" instead of "login"
-                    val startDest = if (authViewModel.state.value.loginSuccess) "profile" else "login"
 
-                    NavHost(navController = navController, startDestination = startDest) {
+                    val startDestination = if (sessionManager.getAuthToken() != null) "main" else "login"
+
+                    NavHost(navController = navController, startDestination = startDestination) {
                         composable("login") {
                             LoginScreen(
                                 viewModel = authViewModel,
@@ -61,9 +58,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToVerifyMfa = { navController.navigate("verify_mfa") },
                                 onNavigateToForgotPassword = { navController.navigate("forgot_password") },
                                 onLoginSuccess = {
-                                    // Fetch profile immediately after login
-                                    authViewModel.fetchProfile()
-                                    navController.navigate("profile")
+                                    navController.navigate("main") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
                                 }
                             )
                         }
@@ -75,48 +72,35 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("verify_account") {
-                             VerifyAccountScreen(
-                                 viewModel = authViewModel,
-                                 onNavigateToLogin = { navController.navigate("login") }
-                             )
+                            VerifyAccountScreen(
+                                viewModel = authViewModel,
+                                onNavigateToLogin = { navController.navigate("login") }
+                            )
                         }
                         composable("verify_mfa") {
-                             VerifyMfaScreen(
-                                 viewModel = authViewModel,
-                                 onLoginSuccess = {
-                                     // Fetch profile immediately after MFA
-                                     authViewModel.fetchProfile()
-                                     navController.navigate("profile")
-                                 }
-                             )
+                            VerifyMfaScreen(
+                                viewModel = authViewModel,
+                                onLoginSuccess = {
+                                    navController.navigate("main") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                }
+                            )
                         }
                         composable("forgot_password") {
-                             ForgotPasswordScreen(
-                                 viewModel = authViewModel,
-                                 onNavigateToResetPassword = { navController.navigate("reset_password") }
-                             )
+                            ForgotPasswordScreen(
+                                viewModel = authViewModel,
+                                onNavigateToResetPassword = { navController.navigate("reset_password") }
+                            )
                         }
                         composable("reset_password") {
-                             ResetPasswordScreen(
-                                 viewModel = authViewModel,
-                                 onNavigateToLogin = { navController.navigate("login") }
-                             )
-                        }
-                        composable("profile") {
-                            // Pass the profile from the view model state
-                            authViewModel.state.value.profile?.let { profile ->
-                                ProfileScreen(
-                                    profile = profile,
-                                    onEditProfile = { navController.navigate("edit_profile") },
-                                    onRefresh = { authViewModel.fetchProfile() }
-                                )
-                            }
-                        }
-                        composable("edit_profile") {
-                            EditProfileScreen(
+                            ResetPasswordScreen(
                                 viewModel = authViewModel,
-                                onNavigateBack = { navController.popBackStack() }
+                                onNavigateToLogin = { navController.navigate("login") }
                             )
+                        }
+                        composable("main") {
+                            MainScreen()
                         }
                     }
                 }

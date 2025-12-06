@@ -1,12 +1,13 @@
 package com.anand.prohands.viewmodel
 
-import androidx.compose.runtime.State
-import androidx.compose.runtime.mutableStateOf
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.anand.prohands.data.*
 import com.anand.prohands.network.RetrofitClient
 import com.anand.prohands.utils.SessionManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.MultipartBody
 import retrofit2.HttpException
@@ -30,10 +31,11 @@ data class AuthState(
 )
 
 class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
-    private val _state = mutableStateOf(AuthState())
-    val state: State<AuthState> = _state
+    
+    // **Refactored: Using MutableStateFlow for industry-standard state management**
+    private val _state = MutableStateFlow(AuthState())
+    val state: StateFlow<AuthState> = _state.asStateFlow()
 
-    // Regex patterns based on backend validation
     private val EMAIL_PATTERN = Pattern.compile(
         "[a-zA-Z0-9\\+\\.\\_\\%\\-\\+]{1,256}" +
                 "\\@" +
@@ -56,7 +58,8 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
                 loginSuccess = true,
                 userId = savedUserId
             )
-            fetchProfile() // Automatically fetch profile if user is already logged in
+            // Fetch profile if session is active
+            fetchProfile() 
         }
     }
 
@@ -70,7 +73,6 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
                     if (body.mfaRequired) {
                         _state.value = _state.value.copy(isLoading = false, mfaRequired = true, emailForVerification = email)
                     } else {
-                        // Store tokens and userId
                         sessionManager.saveAuthToken(body.token)
                         sessionManager.saveUserId(body.userId)
 
@@ -118,14 +120,12 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
     }
 
     fun signup(username: String, email: String, password: String) {
-        // Client-side Validation
         val validationError = validateSignupInput(username, email, password)
         if (validationError != null) {
             _state.value = _state.value.copy(isLoading = false, error = validationError)
             return
         }
 
-        // Normalization
         val normalizedEmail = email.trim().lowercase()
         val normalizedPassword = password.trim()
         val normalizedUsername = username.trim()
@@ -191,7 +191,6 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
     fun resetPassword(otp: String, newPassword: String) {
         val email = _state.value.emailForVerification ?: return
         
-        // Validate new password
         if (!PASSWORD_PATTERN.matcher(newPassword).matches()) {
              _state.value = _state.value.copy(isLoading = false, error = "Password must be 8-128 chars with 1 upper, 1 lower, 1 digit, 1 special char")
              return
@@ -214,6 +213,13 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
     }
     
     fun fetchProfile() {
+        // Ensure we only proceed if we have a token, providing an extra layer of crash prevention
+        if (sessionManager.getAuthToken() == null) {
+            // No token, ensure state is reset for unauthorized access
+            logout(shouldClearSession = false)
+            return
+        }
+
         val userId = _state.value.userId ?: sessionManager.getUserId()
         
         if (userId == null) {
@@ -222,16 +228,15 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         }
         
         viewModelScope.launch {
+            // Keep existing profile while loading to prevent flickers
             _state.value = _state.value.copy(isLoading = true, error = null)
             try {
-                // Pass userId to getProfile
                 val response = RetrofitClient.profileApi.getProfile(userId) 
                 if (response.isSuccessful && response.body() != null) {
                     _state.value = _state.value.copy(isLoading = false, profile = response.body())
                 } else if (response.code() == 401 || response.code() == 403) {
-                     // Handle session expiry
-                     sessionManager.clearSession()
-                     _state.value = _state.value.copy(loginSuccess = false, error = "Session expired")
+                     // Unauthorized/Forbidden: session is invalid, clear it.
+                     logout() 
                 } else {
                      val errorMsg = parseError(response)
                     _state.value = _state.value.copy(isLoading = false, error = errorMsg)
@@ -278,12 +283,29 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         }
     }
 
+    // **New: Dedicated logout function**
+    fun logout(shouldClearSession: Boolean = true) {
+        if (shouldClearSession) {
+            sessionManager.clearSession()
+        }
+        _state.value = AuthState() // Reset state to initial value
+        // Preserve any ongoing authentication flow state that might be necessary (e.g., emailForVerification)
+        // For simplicity, we fully reset here, as the user is likely returning to the login screen.
+    }
+
     fun clearStatusFlags() {
         _state.value = _state.value.copy(updateSuccess = false, uploadSuccess = false, error = null)
     }
 
     fun resetState() {
-        _state.value = AuthState()
+        // Keeps user/login info if session is active, otherwise resets all.
+        val currentUserId = sessionManager.getUserId()
+        val currentToken = sessionManager.getAuthToken()
+        
+        _state.value = AuthState(
+            loginSuccess = currentUserId != null && currentToken != null,
+            userId = currentUserId
+        )
     }
     
     private fun validateSignupInput(username: String, email: String, password: String): String? {
@@ -303,20 +325,22 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         return try {
             val errorBody = response.errorBody()?.string()
             if (!errorBody.isNullOrEmpty()) {
-                errorBody
+                // If the error body is a simple string, return it.
+                // For JSON error bodies, a dedicated error model and parsing logic should be used.
+                errorBody.substringBefore("\n").take(150) // Take a reasonable amount of the error
             } else {
-                "Error: ${response.code()}"
+                "Error: ${response.code()} - No body"
             }
         } catch (e: Exception) {
-            "Error: ${response.code()}"
+            "Error: ${response.code()} - Parsing failed"
         }
     }
 
     private fun handleException(e: Exception) {
         val errorMessage = when (e) {
-            is IOException -> "Network error: Please check your internet connection"
-            is HttpException -> "Server error: ${e.code()}"
-            else -> "Unknown error: ${e.localizedMessage}"
+            is IOException -> "Network error: Please check your internet connection."
+            is HttpException -> "Server error: ${e.code()}. Please try again."
+            else -> "Unknown error. Please restart the app."
         }
         _state.value = _state.value.copy(isLoading = false, error = errorMessage)
     }

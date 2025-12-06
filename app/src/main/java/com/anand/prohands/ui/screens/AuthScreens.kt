@@ -101,7 +101,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
-    val state = viewModel.state.value
+    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
     
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -118,13 +118,14 @@ fun LoginScreen(
     LaunchedEffect(state.mfaRequired) {
         if (state.mfaRequired) {
             onNavigateToVerifyMfa()
-            // Don't reset state here, we need the emailForVerification
+            // State is preserved in ViewModel for verification
         }
     }
 
     LaunchedEffect(state.error) {
         state.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearStatusFlags() // Clear error after showing it
         }
     }
 
@@ -202,7 +203,14 @@ fun LoginScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Button(
-                onClick = { viewModel.login(email, password) },
+                onClick = { 
+                    // STABILITY FIX: Validate input before calling VM
+                    if (email.isNotBlank() && password.isNotBlank()) {
+                        viewModel.login(email, password)
+                    } else {
+                        Toast.makeText(context, "Please enter email and password", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -219,7 +227,7 @@ fun LoginScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
                     } else {
                         Text("LOGIN", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
@@ -243,6 +251,9 @@ fun LoginScreen(
                 )
             }
         }
+
+        // Removed the confusing loginSuccess && isLoading overlay logic. 
+        // The main content's CircularProgressIndicator (inside the button) is sufficient.
     }
 }
 
@@ -264,7 +275,7 @@ fun SignUpScreen(
     onNavigateToVerify: () -> Unit
 ) {
     val context = LocalContext.current
-    val state = viewModel.state.value
+    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
 
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -284,6 +295,7 @@ fun SignUpScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+            viewModel.clearStatusFlags() // Clear error after showing it
         }
     }
 
@@ -400,10 +412,17 @@ fun SignUpScreen(
 
             Button(
                 onClick = {
-                    if (password == confirmPassword) {
-                        viewModel.signup(username, email, password)
-                    } else {
-                        Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                    // STABILITY FIX: Validate all fields are non-empty and passwords match
+                    when {
+                        username.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() -> {
+                            Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show()
+                        }
+                        password != confirmPassword -> {
+                            Toast.makeText(context, "Passwords do not match", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            viewModel.signup(username, email, password)
+                        }
                     }
                 },
                 modifier = Modifier
@@ -422,7 +441,7 @@ fun SignUpScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
                     } else {
                         Text("SIGN UP", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
@@ -464,7 +483,7 @@ fun VerifyAccountScreen(
     onNavigateToLogin: () -> Unit
 ) {
     val context = LocalContext.current
-    val state = viewModel.state.value
+    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
     var otp by remember { mutableStateOf("") }
 
     LaunchedEffect(state.verifySuccess) {
@@ -478,6 +497,7 @@ fun VerifyAccountScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+             viewModel.clearStatusFlags() // Clear error after showing it
         }
     }
 
@@ -498,7 +518,7 @@ fun VerifyAccountScreen(
             )
             
             Text(
-                text = "Enter OTP sent to ${state.emailForVerification}",
+                text = "Enter OTP sent to ${state.emailForVerification ?: "your email"}",
                 fontSize = 16.sp,
                 color = Color.Gray,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -524,6 +544,7 @@ fun VerifyAccountScreen(
             
              Button(
                 onClick = { 
+                    // STABILITY FIX: Validate OTP length
                     if (otp.length == 6) {
                         viewModel.verifyAccount(otp)
                     } else {
@@ -546,7 +567,7 @@ fun VerifyAccountScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
                     } else {
                         Text("VERIFY", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
@@ -570,7 +591,7 @@ fun VerifyMfaScreen(
     onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
-    val state = viewModel.state.value
+    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
     var otp by remember { mutableStateOf("") }
 
     LaunchedEffect(state.loginSuccess) {
@@ -584,6 +605,7 @@ fun VerifyMfaScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+             viewModel.clearStatusFlags() // Clear error after showing it
         }
     }
 
@@ -629,7 +651,14 @@ fun VerifyMfaScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
              Button(
-                onClick = { viewModel.verifyMfa(otp) },
+                onClick = { 
+                    // STABILITY FIX: Validate OTP length
+                    if (otp.length == 6) {
+                        viewModel.verifyMfa(otp)
+                    } else {
+                        Toast.makeText(context, "OTP must be 6 digits", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -646,7 +675,7 @@ fun VerifyMfaScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
                     } else {
                         Text("VERIFY MFA", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
@@ -662,7 +691,7 @@ fun ForgotPasswordScreen(
     onNavigateToResetPassword: () -> Unit
 ) {
     val context = LocalContext.current
-    val state = viewModel.state.value
+    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
     var email by remember { mutableStateOf("") }
 
     LaunchedEffect(state.passwordResetRequestSuccess) {
@@ -675,6 +704,7 @@ fun ForgotPasswordScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+             viewModel.clearStatusFlags() // Clear error after showing it
         }
     }
 
@@ -714,7 +744,14 @@ fun ForgotPasswordScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
              Button(
-                onClick = { viewModel.requestPasswordReset(email) },
+                onClick = { 
+                    // STABILITY FIX: Validate email is not empty
+                    if (email.isNotBlank()) {
+                         viewModel.requestPasswordReset(email)
+                    } else {
+                        Toast.makeText(context, "Please enter your email address", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -731,7 +768,7 @@ fun ForgotPasswordScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
                     } else {
                         Text("SEND OTP", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
@@ -755,7 +792,7 @@ fun ResetPasswordScreen(
     onNavigateToLogin: () -> Unit
 ) {
     val context = LocalContext.current
-    val state = viewModel.state.value
+    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
     var otp by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var newPasswordVisible by remember { mutableStateOf(false) }
@@ -772,6 +809,7 @@ fun ResetPasswordScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
+             viewModel.clearStatusFlags() // Clear error after showing it
         }
     }
 
@@ -846,7 +884,20 @@ fun ResetPasswordScreen(
             Spacer(modifier = Modifier.height(24.dp))
             
              Button(
-                onClick = { viewModel.resetPassword(otp, newPassword) },
+                onClick = { 
+                    // STABILITY FIX: Validate input is not empty and OTP length
+                    when {
+                        otp.length != 6 -> {
+                            Toast.makeText(context, "OTP must be 6 digits", Toast.LENGTH_SHORT).show()
+                        }
+                        newPassword.isBlank() -> {
+                            Toast.makeText(context, "New password cannot be empty", Toast.LENGTH_SHORT).show()
+                        }
+                        else -> {
+                            viewModel.resetPassword(otp, newPassword)
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp)
@@ -863,7 +914,7 @@ fun ResetPasswordScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
                     } else {
                         Text("RESET PASSWORD", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
                     }
