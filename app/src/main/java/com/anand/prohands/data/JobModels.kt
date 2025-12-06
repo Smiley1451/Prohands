@@ -6,11 +6,11 @@ data class JobRequest(
     @SerializedName("providerId") val providerId: String,
     @SerializedName("title") val title: String,
     @SerializedName("description") val description: String? = null,
-    @SerializedName("wage") val wage: Double? = null,
+    @SerializedName("wage") val wage: Double,
     @SerializedName("latitude") val latitude: Double,
     @SerializedName("longitude") val longitude: Double,
     @SerializedName("requiredSkills") val requiredSkills: List<String>? = null,
-    @SerializedName("numberOfEmployees") val numberOfEmployees: Int? = null
+    @SerializedName("numberOfEmployees") val numberOfEmployees: Int
 )
 
 data class JobResponse(

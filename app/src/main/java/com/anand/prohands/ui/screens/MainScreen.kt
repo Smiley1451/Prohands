@@ -8,6 +8,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -15,17 +16,23 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.anand.prohands.navigation.BottomNavigation
 import com.anand.prohands.navigation.NavGraph
+import com.anand.prohands.utils.SessionManager
+import com.anand.prohands.viewmodel.AuthState
 
 @SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun MainScreen() {
+fun MainScreen(authState: AuthState) {
     val navController = rememberNavController()
+    val context = LocalContext.current
+    val sessionManager = SessionManager(context)
+    val currentUserId = sessionManager.getUserId() ?: ""
+
     Scaffold(
         bottomBar = {
             BottomBar(navController = navController)
         }
     ) {
-        NavGraph(navController = navController)
+        NavGraph(navController = navController, currentUserId = currentUserId, authState = authState)
     }
 }
 
