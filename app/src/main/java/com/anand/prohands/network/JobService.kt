@@ -20,6 +20,14 @@ interface JobService {
     @GET("jobs")
     suspend fun getAllJobs(): Response<List<JobResponse>>
 
+    @GET("jobs/feed")
+    suspend fun getJobFeed(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("page") page: Int,
+        @Query("size") size: Int
+    ): Response<List<JobResponse>>
+
     @GET("jobs/{jobId}")
     suspend fun getJob(@Path("jobId") jobId: String): Response<JobResponse>
 

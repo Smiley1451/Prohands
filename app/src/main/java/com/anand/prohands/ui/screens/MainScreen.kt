@@ -20,14 +20,11 @@ import com.anand.prohands.navigation.BottomNavigation
 import com.anand.prohands.navigation.NavGraph
 import com.anand.prohands.utils.SessionManager
 import com.anand.prohands.viewmodel.AuthViewModel
-import com.anand.prohands.viewmodel.AuthState
 
 @Composable
 fun MainScreen(
-    authState: AuthState,
     authViewModel: AuthViewModel,
     onLogout: () -> Unit,
-    onRefresh: () -> Unit
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
@@ -43,10 +40,8 @@ fun MainScreen(
             NavGraph(
                 navController = navController,
                 currentUserId = currentUserId,
-                authState = authState,
                 authViewModel = authViewModel,
-                onLogout = onLogout,
-                onRefresh = onRefresh
+                onLogout = onLogout
             )
         }
     }
@@ -58,7 +53,7 @@ fun BottomBar(navController: NavHostController) {
         BottomNavigation.Home,
         BottomNavigation.Search,
         BottomNavigation.PostJob,
-        BottomNavigation.Messages,
+        BottomNavigation.Jobs,
         BottomNavigation.Profile
     )
     val navBackStackEntry by navController.currentBackStackEntryAsState()

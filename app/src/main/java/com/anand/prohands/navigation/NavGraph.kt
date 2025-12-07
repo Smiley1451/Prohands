@@ -7,24 +7,15 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.anand.prohands.ui.screens.EditProfileScreen
-import com.anand.prohands.ui.screens.HomeScreen
-import com.anand.prohands.ui.screens.JobScreen
-import com.anand.prohands.ui.screens.MessagesScreen
-import com.anand.prohands.ui.screens.PostJobScreen
-import com.anand.prohands.ui.screens.ProfileScreen
-import com.anand.prohands.ui.screens.SearchScreen
+import com.anand.prohands.ui.screens.*
 import com.anand.prohands.viewmodel.AuthViewModel
-import com.anand.prohands.viewmodel.AuthState
 
 @Composable
 fun NavGraph(
     navController: NavHostController,
     currentUserId: String,
-    authState: AuthState,
     authViewModel: AuthViewModel,
     onLogout: () -> Unit,
-    onRefresh: () -> Unit
 ) {
     NavHost(
         navController = navController,
@@ -39,21 +30,21 @@ fun NavGraph(
         composable(BottomNavigation.PostJob.route) {
             JobScreen(currentUserId = currentUserId, onNavigateToCreateJob = { navController.navigate("create_job") })
         }
-        composable(BottomNavigation.Messages.route) {
-            MessagesScreen()
+        composable(BottomNavigation.Jobs.route) {
+            ManageJobsScreen(navController = navController, currentUserId = currentUserId)
         }
         composable(BottomNavigation.Profile.route) {
             val shouldRefresh = navController.currentBackStackEntry?.savedStateHandle?.get<Boolean>("shouldRefresh")
             LaunchedEffect(shouldRefresh) {
                 if (shouldRefresh == true) {
-                    onRefresh()
+                    authViewModel.fetchProfile()
                     navController.currentBackStackEntry?.savedStateHandle?.set("shouldRefresh", false)
                 }
             }
             ProfileScreen(
-                authState = authState,
+                userId = currentUserId,
+                isReadOnly = false,
                 onEditProfile = { navController.navigate("edit_profile/$currentUserId") },
-                onRefresh = onRefresh,
                 onLogout = onLogout
             )
         }
@@ -66,6 +57,34 @@ fun NavGraph(
         ) {
             val userId = it.arguments?.getString("userId") ?: ""
             EditProfileScreen(navController = navController, userId = userId)
+        }
+        composable(
+            "worker_recommendations/{jobId}/{lat}/{lon}/{title}",
+            arguments = listOf(
+                navArgument("jobId") { type = NavType.StringType },
+                navArgument("lat") { type = NavType.FloatType },
+                navArgument("lon") { type = NavType.FloatType },
+                navArgument("title") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
+            val lat = backStackEntry.arguments?.getFloat("lat")?.toDouble() ?: 0.0
+            val lon = backStackEntry.arguments?.getFloat("lon")?.toDouble() ?: 0.0
+            val title = backStackEntry.arguments?.getString("title") ?: ""
+            WorkerRecommendationsScreen(
+                navController = navController,
+                jobId = jobId,
+                latitude = lat,
+                longitude = lon,
+                jobTitle = title
+            )
+        }
+        composable(
+            "worker_profile/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val userId = backStackEntry.arguments?.getString("userId") ?: ""
+            ProfileScreen(userId = userId, isReadOnly = true)
         }
     }
 }

@@ -1,6 +1,8 @@
 package com.anand.prohands.network
 
 import com.anand.prohands.data.ClientProfileDto
+import com.anand.prohands.data.LocationUpdateRequest
+import com.anand.prohands.data.WorkerRecommendationDto
 import okhttp3.MultipartBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -33,4 +35,20 @@ interface ProfileApi {
         @Query("skill") skill: String?,
         @Query("minRating") minRating: Double?
     ): Response<List<ClientProfileDto>>
+
+    @GET("api/clients/recommendations")
+    suspend fun getWorkerRecommendations(
+        @Query("jobTitle") jobTitle: String,
+        @Query("jobDescription") jobDescription: String,
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("page") page: Int,
+        @Query("size") size: Int
+    ): Response<List<WorkerRecommendationDto>>
+
+    @POST("api/clients/{userId}/location")
+    suspend fun updateLocation(
+        @Path("userId") userId: String,
+        @Body locationUpdateRequest: LocationUpdateRequest
+    ): Response<Unit>
 }

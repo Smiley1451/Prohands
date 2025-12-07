@@ -14,6 +14,9 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,9 +30,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.anand.prohands.data.ClientProfileDto
-import com.anand.prohands.viewmodel.AuthState
+import com.anand.prohands.viewmodel.ProfileViewModel
+import com.anand.prohands.viewmodel.ProfileViewModelFactory
 
 // --- 1. Enhanced Professional Palette ---
 object ProColors {
@@ -46,11 +51,20 @@ object ProColors {
 
 @Composable
 fun ProfileScreen(
-    authState: AuthState,
+    userId: String,
+    isReadOnly: Boolean,
     onEditProfile: () -> Unit = {},
-    onRefresh: () -> Unit = {},
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    viewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory())
 ) {
+    val profile by viewModel.profile.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
+    val error by viewModel.error.collectAsState()
+
+    LaunchedEffect(userId) {
+        viewModel.fetchProfile(userId)
+    }
+
     Scaffold(
         containerColor = ProColors.SurfaceBg
     ) { paddingValues ->
@@ -61,9 +75,9 @@ fun ProfileScreen(
             contentAlignment = Alignment.Center
         ) {
             when {
-                authState.isLoading -> CircularProgressIndicator(color = ProColors.PrimaryBlue)
-                authState.error != null -> ErrorView(authState.error, onRefresh)
-                authState.profile != null -> ProfileContent(authState.profile, onEditProfile, onRefresh, onLogout)
+                isLoading -> CircularProgressIndicator(color = ProColors.PrimaryBlue)
+                error != null -> ErrorView(error) { viewModel.fetchProfile(userId) }
+                profile != null -> ProfileContent(profile!!, isReadOnly, onEditProfile, { viewModel.fetchProfile(userId) }, onLogout)
             }
         }
     }
@@ -89,6 +103,7 @@ fun ErrorView(error: String?, onRefresh: () -> Unit) {
 @Composable
 fun ProfileContent(
     profile: ClientProfileDto,
+    isReadOnly: Boolean,
     onEditProfile: () -> Unit,
     onRefresh: () -> Unit,
     onLogout: () -> Unit
@@ -101,7 +116,9 @@ fun ProfileContent(
         item { AiInsightCard(profile) }
         item { SkillsSection(profile) }
         item { TrustMetricsGrid(profile) }
-        item { ProfileActions(onEditProfile, onRefresh, onLogout) }
+        if (!isReadOnly) {
+            item { ProfileActions(onEditProfile, onRefresh, onLogout) }
+        }
     }
 }
 
@@ -433,6 +450,6 @@ fun ProfileScreenPreviewEnhanced() {
         profileCompletionPercent = 100
     )
     MaterialTheme {
-        ProfileScreen(authState = AuthState(profile = dummyProfile))
+        ProfileScreen(userId = "anand1234", isReadOnly = false)
     }
 }

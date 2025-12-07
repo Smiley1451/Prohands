@@ -1,11 +1,7 @@
 package com.anand.prohands.navigation
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Message
-import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.AddCircle
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.*
 import androidx.compose.ui.graphics.vector.ImageVector
 
 sealed class BottomNavigation(
@@ -28,10 +24,10 @@ sealed class BottomNavigation(
         title = "Post Job",
         icon = Icons.Default.AddCircle
     )
-    object Messages : BottomNavigation(
-        route = "messages",
-        title = "Messages",
-        icon = Icons.AutoMirrored.Filled.Message
+    object Jobs : BottomNavigation(
+        route = "jobs",
+        title = "Jobs",
+        icon = Icons.Default.Work
     )
     object Profile : BottomNavigation(
         route = "profile",
