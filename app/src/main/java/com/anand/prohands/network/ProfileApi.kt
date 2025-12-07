@@ -24,6 +24,9 @@ interface ProfileApi {
         @Path("userId") userId: String,
         @Part file: MultipartBody.Part
     ): Response<ClientProfileDto>
+
+    @POST("api/clients/{userId}/refresh-ai")
+    suspend fun triggerAiRefresh(@Path("userId") userId: String): Response<ClientProfileDto>
     
     @GET("api/clients")
     suspend fun searchProfiles(

@@ -61,6 +61,7 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToVerifyMfa = { navController.navigate("verify_mfa") },
                                 onNavigateToForgotPassword = { navController.navigate("forgot_password") },
                                 onLoginSuccess = {
+                                    authViewModel.fetchProfile() // FIX: Fetch profile on login
                                     navController.navigate("main") {
                                         popUpTo("login") { inclusive = true }
                                     }
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
                             VerifyMfaScreen(
                                 viewModel = authViewModel,
                                 onLoginSuccess = {
+                                    authViewModel.fetchProfile() // FIX: Fetch profile on MFA success
                                     navController.navigate("main") {
                                         popUpTo("login") { inclusive = true }
                                     }
@@ -103,7 +105,17 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("main") {
-                            MainScreen(authState = authState)
+                            MainScreen(
+                                authViewModel = authViewModel,
+                                authState = authState,
+                                onLogout = {
+                                    authViewModel.logout()
+                                    navController.navigate("login") {
+                                        popUpTo("main") { inclusive = true }
+                                    }
+                                },
+                                onRefresh = { authViewModel.fetchProfile() }
+                            )
                         }
                     }
                 }

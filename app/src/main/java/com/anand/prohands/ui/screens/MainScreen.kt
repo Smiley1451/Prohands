@@ -1,6 +1,7 @@
 package com.anand.prohands.ui.screens
 
-import android.annotation.SuppressLint
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -8,6 +9,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -17,11 +19,16 @@ import androidx.navigation.compose.rememberNavController
 import com.anand.prohands.navigation.BottomNavigation
 import com.anand.prohands.navigation.NavGraph
 import com.anand.prohands.utils.SessionManager
+import com.anand.prohands.viewmodel.AuthViewModel
 import com.anand.prohands.viewmodel.AuthState
 
-@SuppressLint("UnusedMaterial3ScaffoldPaddingParameter")
 @Composable
-fun MainScreen(authState: AuthState) {
+fun MainScreen(
+    authState: AuthState,
+    authViewModel: AuthViewModel,
+    onLogout: () -> Unit,
+    onRefresh: () -> Unit
+) {
     val navController = rememberNavController()
     val context = LocalContext.current
     val sessionManager = SessionManager(context)
@@ -31,8 +38,17 @@ fun MainScreen(authState: AuthState) {
         bottomBar = {
             BottomBar(navController = navController)
         }
-    ) {
-        NavGraph(navController = navController, currentUserId = currentUserId, authState = authState)
+    ) { innerPadding ->
+        Box(modifier = Modifier.padding(innerPadding)) { // Apply the padding here
+            NavGraph(
+                navController = navController,
+                currentUserId = currentUserId,
+                authState = authState,
+                authViewModel = authViewModel,
+                onLogout = onLogout,
+                onRefresh = onRefresh
+            )
+        }
     }
 }
 

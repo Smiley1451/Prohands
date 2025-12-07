@@ -62,23 +62,37 @@ class JobViewModel : ViewModel() {
             if (response.isSuccessful) fetchMyJobs(providerId)
         }
     }
-    
-    fun postJob(title: String, desc: String, wage: String, lat: Double, lng: Double, employees: String, providerId: String) {
+
+    fun postJob(
+        title: String, 
+        desc: String, 
+        wage: String, 
+        lat: Double, 
+        lng: Double, 
+        employees: String, 
+        providerId: String, 
+        onSuccess: () -> Unit
+    ) {
         val request = JobRequest(
             providerId = providerId,
             title = title,
             description = desc,
-            wage = wage.toDoubleOrNull() ?: 0.0, 
+            wage = wage.toDoubleOrNull() ?: 0.0,
             latitude = lat,
             longitude = lng,
-            requiredSkills = listOf("General"), 
+            requiredSkills = listOf("General"),
             numberOfEmployees = employees.toIntOrNull() ?: 1
         )
-        
+
         viewModelScope.launch {
-            val response = RetrofitClient.jobService.createJob(request)
-            if (response.isSuccessful) {
-                // Handle success
+            try {
+                val response = RetrofitClient.jobService.createJob(request)
+                if (response.isSuccessful) {
+                    onSuccess()
+                    fetchMyJobs(providerId)
+                }
+            } catch (e: Exception) {
+                // Handle error
             }
         }
     }

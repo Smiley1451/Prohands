@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material3.*
@@ -18,17 +19,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavController
 import com.anand.prohands.data.JobRequest
 import com.anand.prohands.data.JobResponse
+import com.anand.prohands.ui.theme.BrandBlue
+import com.anand.prohands.ui.theme.BrandTeal
+import com.anand.prohands.ui.theme.BgLight
 import com.anand.prohands.viewmodel.JobViewModel
-
-// --- Professional Color Palette ---
-val BrandBlue = Color(0xFF0D47A1)    // Professional Trust
-val BrandTeal = Color(0xFF009688)    // Action/Success
-val StatusOrange = Color(0xFFFF9800) // In Progress
-val BgLight = Color(0xFFF5F7FA)      // Clean Background
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -78,10 +78,9 @@ fun JobScreen(
                     containerColor = Color.White,
                     contentColor = BrandBlue,
                     indicator = { tabPositions ->
-                        TabRowDefaults.Indicator(
+                        TabRowDefaults.SecondaryIndicator(
                             Modifier.tabIndicatorOffset(tabPositions[selectedTab]),
                             color = BrandTeal,
-                            height = 3.dp
                         )
                     }
                 ) {
@@ -219,7 +218,7 @@ fun MyJobManageCard(
             Text("Posted on: ${job.createdAt.take(10)}", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             Spacer(Modifier.height(12.dp))
             
-            Divider(color = Color.LightGray.copy(alpha = 0.5f))
+            HorizontalDivider(color = Color.LightGray.copy(alpha = 0.5f))
             
             // Action Buttons Row
             Row(
@@ -332,12 +331,103 @@ fun EmptyState(text: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PostJobScreen() {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = "Post Job Screen")
+fun PostJobScreen(
+    navController: NavController,
+    currentUserId: String
+) {
+    val viewModel: JobViewModel = viewModel()
+    
+    var title by remember { mutableStateOf("") }
+    var description by remember { mutableStateOf("") }
+    var wage by remember { mutableStateOf("") }
+    var employees by remember { mutableStateOf("1") }
+    
+    var latitude by remember { mutableStateOf("12.9716") }
+    var longitude by remember { mutableStateOf("77.5946") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Create New Job", color = BrandBlue, fontWeight = FontWeight.Bold) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = BrandBlue)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+            )
+        },
+        containerColor = BgLight
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .padding(padding)
+                .padding(16.dp)
+                .fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedTextField(
+                value = title,
+                onValueChange = { title = it },
+                label = { Text("Job Title") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = wage,
+                    onValueChange = { wage = it },
+                    label = { Text("Wage ($/hr)") },
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+                OutlinedTextField(
+                    value = employees,
+                    onValueChange = { employees = it },
+                    label = { Text("Workers") },
+                    modifier = Modifier.weight(1f),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true
+                )
+            }
+
+            OutlinedTextField(
+                value = description,
+                onValueChange = { description = it },
+                label = { Text("Description") },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+                maxLines = 5
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    if (title.isNotEmpty() && wage.isNotEmpty()) {
+                        viewModel.postJob(
+                            title = title,
+                            desc = description,
+                            wage = wage,
+                            lat = latitude.toDoubleOrNull() ?: 0.0,
+                            lng = longitude.toDoubleOrNull() ?: 0.0,
+                            employees = employees,
+                            providerId = currentUserId,
+                            onSuccess = {
+                                navController.popBackStack()
+                            }
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text("Post Job", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
