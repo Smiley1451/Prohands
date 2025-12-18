@@ -1,12 +1,14 @@
 package com.anand.prohands.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -20,6 +22,7 @@ import com.anand.prohands.data.JobRequest
 import com.anand.prohands.ui.components.MapPickerComponent
 import com.anand.prohands.ui.theme.BrandBlue
 import com.anand.prohands.ui.theme.BgLight
+import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.PostJobViewModel
 import com.anand.prohands.viewmodel.PostJobViewModelFactory
 import com.google.android.gms.maps.model.LatLng
@@ -32,7 +35,7 @@ fun PostJobScreen(
 ) {
     val context = LocalContext.current
     val viewModel: PostJobViewModel = viewModel(factory = PostJobViewModelFactory(context))
-    
+
     var title by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var wage by remember { mutableStateOf("") }
@@ -41,6 +44,7 @@ fun PostJobScreen(
 
     val postResult by viewModel.postResult.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val currentLocation by viewModel.currentLocation.collectAsState()
 
     LaunchedEffect(Unit) {
         viewModel.fetchCurrentLocation()
@@ -66,81 +70,111 @@ fun PostJobScreen(
         },
         containerColor = BgLight
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
                 .padding(padding)
-                .padding(16.dp)
                 .fillMaxSize(),
+            contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Job Title") },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            item {
                 OutlinedTextField(
-                    value = wage,
-                    onValueChange = { wage = it },
-                    label = { Text("Wage ($/hr)") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
-                )
-                OutlinedTextField(
-                    value = employees,
-                    onValueChange = { employees = it },
-                    label = { Text("Workers") },
-                    modifier = Modifier.weight(1f),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Job Title") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = ProColors.TextPrimary,
+                        unfocusedTextColor = ProColors.TextPrimary,
+                        cursorColor = BrandBlue
+                    )
                 )
             }
 
-            OutlinedTextField(
-                value = description,
-                onValueChange = { description = it },
-                label = { Text("Description") },
-                modifier = Modifier.fillMaxWidth(),
-                minLines = 3,
-                maxLines = 5
-            )
-
-            Box(modifier = Modifier.height(300.dp)) {
-                MapPickerComponent { location ->
-                    selectedLocation = location
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    OutlinedTextField(
+                        value = wage,
+                        onValueChange = { wage = it },
+                        label = { Text("Wage ($/hr)") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = ProColors.TextPrimary,
+                            unfocusedTextColor = ProColors.TextPrimary,
+                            cursorColor = BrandBlue
+                        )
+                    )
+                    OutlinedTextField(
+                        value = employees,
+                        onValueChange = { employees = it },
+                        label = { Text("Workers") },
+                        modifier = Modifier.weight(1f),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = ProColors.TextPrimary,
+                            unfocusedTextColor = ProColors.TextPrimary,
+                            cursorColor = BrandBlue
+                        )
+                    )
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = {
-                    if (title.isNotEmpty() && wage.isNotEmpty() && selectedLocation != null) {
-                        viewModel.postJob(
-                            JobRequest(
-                                title = title,
-                                description = description,
-                                wage = wage.toDoubleOrNull() ?: 0.0,
-                                latitude = selectedLocation!!.latitude,
-                                longitude = selectedLocation!!.longitude,
-                                numberOfEmployees = employees.toIntOrNull() ?: 1,
-                                providerId = currentUserId
-                            )
-                        )
+            item {
+                OutlinedTextField(
+                    value = description,
+                    onValueChange = { description = it },
+                    label = { Text("Description") },
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 3,
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = ProColors.TextPrimary,
+                        unfocusedTextColor = ProColors.TextPrimary,
+                        cursorColor = BrandBlue
+                    )
+                )
+            }
+
+            item {
+                Box(modifier = Modifier.height(300.dp)) {
+                    MapPickerComponent(initialLocation = currentLocation) { location ->
+                        selectedLocation = location
                     }
-                },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
-                shape = RoundedCornerShape(8.dp),
-                enabled = !isLoading
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(color = Color.White)
-                } else {
-                    Text("Post Job", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(8.dp))
+                Button(
+                    onClick = {
+                        if (title.isNotEmpty() && wage.isNotEmpty() && selectedLocation != null) {
+                            viewModel.postJob(
+                                JobRequest(
+                                    title = title,
+                                    description = description,
+                                    wage = wage.toDoubleOrNull() ?: 0.0,
+                                    latitude = selectedLocation!!.latitude,
+                                    longitude = selectedLocation!!.longitude,
+                                    numberOfEmployees = employees.toIntOrNull() ?: 1,
+                                    providerId = currentUserId
+                                )
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().height(50.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                    shape = RoundedCornerShape(8.dp),
+                    enabled = !isLoading
+                ) {
+                    if (isLoading) {
+                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                    } else {
+                        Text("Post Job", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

@@ -28,3 +28,16 @@ val Pink80 = Color(0xFFEFB8C8)
 val Purple40 = Color(0xFF6650a4)
 val PurpleGrey40 = Color(0xFF625b71)
 val Pink40 = Color(0xFF7D5260)
+
+// --- Enhanced Professional Palette ---
+object ProColors {
+    val PrimaryBlue = Color(0xFF2563EB) // Standard Trust Blue
+    val DeepBlue = Color(0xFF172554)    // Darker, more solid blue for gradient start
+    val VividBlue = Color(0xFF1D4ED8)   // Vibrant blue for gradient end
+    val SurfaceBg = Color(0xFFF8FAFC)
+    val TextPrimary = Color(0xFF1E293B)
+    val TextSecondary = Color(0xFF64748B)
+    val Gold = Color(0xFFF59E0B)
+    val Green = Color(0xFF10B981)
+    val White = Color.White
+}

@@ -28,7 +28,7 @@ fun NavGraph(
             SearchScreen()
         }
         composable(BottomNavigation.PostJob.route) {
-            JobScreen(currentUserId = currentUserId, onNavigateToCreateJob = { navController.navigate("create_job") })
+            PostJobScreen(navController = navController, currentUserId = currentUserId)
         }
         composable(BottomNavigation.Jobs.route) {
             ManageJobsScreen(navController = navController, currentUserId = currentUserId)

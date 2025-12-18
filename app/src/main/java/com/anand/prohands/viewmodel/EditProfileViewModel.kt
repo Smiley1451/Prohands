@@ -13,7 +13,7 @@ import okhttp3.MultipartBody
 
 class EditProfileViewModel : ViewModel() {
 
-    private val profileApi: ProfileApi = RetrofitClient.profileApi
+    private val profileApi: ProfileApi = RetrofitClient.instance.create(ProfileApi::class.java)
 
     var profile by mutableStateOf<ClientProfileDto?>(null)
         private set

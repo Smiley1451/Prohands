@@ -1,76 +1,83 @@
 package com.anand.prohands.ui.components
 
-import android.Manifest
-import android.content.Context
-import android.content.pm.PackageManager
 import android.location.Location
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
+import kotlinx.coroutines.launch
 
 @Composable
-fun MapPickerComponent(onLocationSelected: (LatLng) -> Unit) {
-    val context = LocalContext.current
-    val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
+fun MapPickerComponent(initialLocation: Location?, onLocationSelected: (LatLng) -> Unit) {
+    val cameraPositionState = rememberCameraPositionState()
+    val markerState = rememberMarkerState()
+    val coroutineScope = rememberCoroutineScope()
 
-    var selectedLocation by remember { mutableStateOf<LatLng?>(null) }
+    var hasInitialized by remember { mutableStateOf(false) }
 
-    // Get last known location
-    LaunchedEffect(Unit) {
-        if (ActivityCompat.checkSelfPermission(
-                context,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-                location?.let {
-                    selectedLocation = LatLng(it.latitude, it.longitude)
-                }
-            }
+    LaunchedEffect(initialLocation) {
+        if (initialLocation != null && !hasInitialized) {
+            val initialLatLng = LatLng(initialLocation.latitude, initialLocation.longitude)
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(initialLatLng, 15f)
+            markerState.position = initialLatLng
+            onLocationSelected(initialLatLng)
+            hasInitialized = true
         }
     }
 
-    if (selectedLocation == null) {
+    // Observe marker position changes (including after drag) and report them
+    LaunchedEffect(markerState.position) {
+        onLocationSelected(markerState.position)
+    }
+
+    if (!hasInitialized && initialLocation == null) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Getting your location...")
+            Text("Waiting for location...")
         }
     } else {
-        val cameraPositionState = rememberCameraPositionState {
-            position = CameraPosition.fromLatLngZoom(selectedLocation!!, 15f)
-        }
-        val markerState = rememberMarkerState(position = selectedLocation!!)
-
         Box(modifier = Modifier.fillMaxSize()) {
             GoogleMap(
                 modifier = Modifier.fillMaxSize(),
                 cameraPositionState = cameraPositionState,
-                onMapClick = {
-                    markerState.position = it
-                    onLocationSelected(it)
+                onMapClick = { latLng ->
+                    markerState.position = latLng
+                    // The LaunchedEffect above will handle the callback
                 }
             ) {
-                Marker(state = markerState, draggable = true)
+                Marker(
+                    state = markerState,
+                    draggable = true
+                )
             }
             Button(
                 modifier = Modifier.align(Alignment.BottomEnd).padding(16.dp),
-                onClick = { /* Move camera to current location */ }
+                onClick = {
+                    if (initialLocation != null) {
+                        val currentLatLng = LatLng(initialLocation.latitude, initialLocation.longitude)
+                        coroutineScope.launch {
+                            cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(currentLatLng, 15f))
+                        }
+                        markerState.position = currentLatLng
+                        // The LaunchedEffect above will handle the callback
+                    }
+                }
             ) {
-                Text("Current Location")
+                Icon(Icons.Default.MyLocation, contentDescription = "Current Location")
             }
         }
     }
