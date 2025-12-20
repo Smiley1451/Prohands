@@ -6,10 +6,12 @@ import android.app.NotificationManager
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import com.anand.prohands.ProHandsApplication
 import com.anand.prohands.R
 import com.anand.prohands.data.LocationUpdateRequest
 import com.anand.prohands.network.ProfileApi
@@ -35,7 +37,15 @@ class LocationForegroundService : Service() {
     override fun onCreate() {
         super.onCreate()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        sessionManager = SessionManager(applicationContext)
+        
+        // Use the singleton instance from Application
+        // Check if application is ProHandsApplication to avoid ClassCastException
+        sessionManager = try {
+             (application as ProHandsApplication).sessionManager
+        } catch (e: Exception) {
+             SessionManager(applicationContext)
+        }
+        
         profileApi = RetrofitClient.instance.create(ProfileApi::class.java)
     }
 
@@ -48,10 +58,18 @@ class LocationForegroundService : Service() {
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("ProHands Location Service")
             .setContentText("Tracking your location to find nearby jobs")
-            .setSmallIcon(R.mipmap.ic_launcher) // Replace with a proper icon
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setPriority(NotificationCompat.PRIORITY_LOW) // Lower priority to be less intrusive
             .build()
-
-        startForeground(NOTIFICATION_ID, notification)
+        
+        // Important: startForeground must be called within 5 seconds of the service starting
+        // on Android 8+ (Oreo).
+        try {
+            startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            // e.g. ForegroundServiceStartNotAllowedException on Android 12+
+        }
+        
         startLocationUpdates()
 
         return START_STICKY
@@ -90,8 +108,6 @@ class LocationForegroundService : Service() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             ) != PackageManager.PERMISSION_GRANTED
         ) {
-            // Permissions are not granted. The service will not be able to get location updates.
-            // You should request permissions from the UI before starting the service.
             return
         }
 
@@ -104,18 +120,22 @@ class LocationForegroundService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
-        fusedLocationClient.removeLocationUpdates(locationCallback)
+        if (::locationCallback.isInitialized) {
+            fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
         serviceScope.cancel()
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "ProHands Location",
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "ProHands Location",
+                NotificationManager.IMPORTANCE_LOW // Lower importance for background service
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
     }
 
     companion object {

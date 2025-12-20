@@ -47,10 +47,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Initialize RetrofitClient with Context
-        RetrofitClient.init(applicationContext)
-
-        val sessionManager = SessionManager(applicationContext)
+        // Get singleton SessionManager
+        val sessionManager = (application as ProHandsApplication).sessionManager
 
         if (sessionManager.getAuthToken() != null) {
             requestLocationPermissions()

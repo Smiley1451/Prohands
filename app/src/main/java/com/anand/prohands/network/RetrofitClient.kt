@@ -2,6 +2,7 @@ package com.anand.prohands.network
 
 import android.content.Context
 import com.anand.prohands.BuildConfig
+import com.anand.prohands.ProHandsApplication
 import com.anand.prohands.utils.SessionManager
 import okhttp3.CertificatePinner
 import okhttp3.OkHttpClient
@@ -13,23 +14,22 @@ import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
     private const val BASE_URL = "https://unsufferably-heimish-tashina.ngrok-free.dev/"
-
-    // NOTE: You must replace this with your actual production host and SHA-256 pin
+    
     private const val CERT_HOST = "unsufferably-heimish-tashina.ngrok-free.dev"
     private const val CERT_PIN_PLACEHOLDER = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
-    private lateinit var sessionManager: SessionManager
-
-    fun init(context: Context) {
-        sessionManager = SessionManager(context)
-    }
+    // Removed the manual init requirement. We will pull SessionManager from the Application instance.
 
     private val okHttpClient: OkHttpClient by lazy {
+        // Access SessionManager directly from the Application instance
+        val sessionManager = ProHandsApplication.instance.sessionManager
+        val authInterceptor = AuthInterceptor(sessionManager)
+
         val clientBuilder = OkHttpClient.Builder()
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
-            .addInterceptor(AuthInterceptor(sessionManager))
+            .addInterceptor(authInterceptor)
 
         if (BuildConfig.DEBUG) {
             val logging = HttpLoggingInterceptor().apply {

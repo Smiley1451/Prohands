@@ -36,20 +36,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
+import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.EditProfileViewModel
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody.Companion.toRequestBody
-
-// --- Professional Theme Colors (Consistent with your Profile Screen) ---
-object ProEditColors {
-    val PrimaryBlue = Color(0xFF2563EB)
-    val SurfaceBg = Color(0xFFF8FAFC)
-    val TextPrimary = Color(0xFF1E293B)
-    val TextSecondary = Color(0xFF64748B)
-    val White = Color.White
-    val InputBg = Color(0xFFFFFFFF)
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -65,7 +56,7 @@ fun EditProfileScreen(
     var phone by remember { mutableStateOf("") }
     var skills by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var isSaving by remember { mutableStateOf(false) } // State for Save Button loading
+    var isSaving by remember { mutableStateOf(false) }
 
     // Image Picker
     val imagePickerLauncher = rememberLauncherForActivityResult(
@@ -100,21 +91,21 @@ fun EditProfileScreen(
     }
 
     Scaffold(
-        containerColor = ProEditColors.SurfaceBg,
+        containerColor = ProColors.Background,
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text("Edit Profile", color = ProEditColors.TextPrimary) },
+                title = { Text("Edit Profile", color = ProColors.OnBackground) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
-                            tint = ProEditColors.TextPrimary
+                            tint = ProColors.OnBackground
                         )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                    containerColor = ProEditColors.SurfaceBg
+                    containerColor = ProColors.Background
                 )
             )
         }
@@ -124,9 +115,9 @@ fun EditProfileScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .verticalScroll(rememberScrollState()) // Allow scrolling for small screens
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 24.dp, vertical = 16.dp)
-                .imePadding(), // Prevent keyboard from covering content
+                .imePadding(),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // --- 1. Image Upload Section ---
@@ -141,12 +132,12 @@ fun EditProfileScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .clip(CircleShape)
-                        .background(Color.Gray.copy(alpha = 0.1f))
-                        .border(BorderStroke(4.dp, ProEditColors.White), CircleShape),
+                        .background(ProColors.SurfaceVariant)
+                        .border(BorderStroke(4.dp, ProColors.Surface), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
                     if (editProfileViewModel.isImageUploading) {
-                        CircularProgressIndicator(color = ProEditColors.PrimaryBlue)
+                        CircularProgressIndicator(color = ProColors.Primary)
                     } else {
                         Image(
                             painter = rememberAsyncImagePainter(imageUri ?: profile?.profilePictureUrl ?: "https://via.placeholder.com/150"),
@@ -160,8 +151,8 @@ fun EditProfileScreen(
                 // Camera Icon Badge
                 Surface(
                     shape = CircleShape,
-                    color = ProEditColors.PrimaryBlue,
-                    border = BorderStroke(2.dp, ProEditColors.White),
+                    color = ProColors.Primary,
+                    border = BorderStroke(2.dp, ProColors.Surface),
                     modifier = Modifier.size(40.dp).offset(x = (-4).dp, y = (-4).dp),
                     shadowElevation = 4.dp
                 ) {
@@ -169,7 +160,7 @@ fun EditProfileScreen(
                         Icon(
                             imageVector = Icons.Outlined.CameraAlt,
                             contentDescription = "Edit Image",
-                            tint = Color.White,
+                            tint = ProColors.OnPrimary,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -205,7 +196,7 @@ fun EditProfileScreen(
                 onValueChange = { skills = it },
                 label = "Skills (comma-separated)",
                 placeholder = "e.g., Electrician, Plumber",
-                icon = Icons.Default.Build, // Tool icon
+                icon = Icons.Default.Build,
                 singleLine = false,
                 maxLines = 3
             )
@@ -234,21 +225,21 @@ fun EditProfileScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = ProEditColors.PrimaryBlue,
-                    disabledContainerColor = ProEditColors.PrimaryBlue.copy(alpha = 0.6f)
+                    containerColor = ProColors.Primary,
+                    disabledContainerColor = ProColors.Primary.copy(alpha = 0.6f)
                 ),
                 enabled = !isSaving
             ) {
                 if (isSaving) {
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
-                        color = Color.White,
+                        color = ProColors.OnPrimary,
                         strokeWidth = 2.dp
                     )
                     Spacer(modifier = Modifier.width(12.dp))
-                    Text("Saving...")
+                    Text("Saving...", color = ProColors.OnPrimary)
                 } else {
-                    Text("Save Changes", fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+                    Text("Save Changes", fontSize = 16.sp, fontWeight = FontWeight.SemiBold, color = ProColors.OnPrimary)
                 }
             }
         }
@@ -271,20 +262,20 @@ fun ProTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(label) },
-        placeholder = if (placeholder != null) { { Text(placeholder, color = Color.Gray) } } else null,
+        placeholder = if (placeholder != null) { { Text(placeholder, color = ProColors.TextTertiary) } } else null,
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedTextColor = ProEditColors.TextPrimary,
-            unfocusedTextColor = ProEditColors.TextPrimary,
-            focusedBorderColor = ProEditColors.PrimaryBlue,
-            unfocusedBorderColor = Color.LightGray,
-            focusedLabelColor = ProEditColors.PrimaryBlue,
-            unfocusedContainerColor = ProEditColors.InputBg,
-            focusedContainerColor = ProEditColors.InputBg
+            focusedTextColor = ProColors.TextPrimary,
+            unfocusedTextColor = ProColors.TextPrimary,
+            focusedBorderColor = ProColors.Primary,
+            unfocusedBorderColor = ProColors.Divider,
+            focusedLabelColor = ProColors.Primary,
+            unfocusedContainerColor = ProColors.Surface,
+            focusedContainerColor = ProColors.Surface
         ),
         leadingIcon = {
-            Icon(imageVector = icon, contentDescription = null, tint = ProEditColors.TextSecondary)
+            Icon(imageVector = icon, contentDescription = null, tint = ProColors.TextSecondary)
         },
         keyboardOptions = KeyboardOptions(
             keyboardType = keyboardType,

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,6 +19,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.anand.prohands.navigation.BottomNavigation
 import com.anand.prohands.navigation.NavGraph
+import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.utils.SessionManager
 import com.anand.prohands.viewmodel.AuthViewModel
 
@@ -32,6 +34,7 @@ fun MainScreen(
     val currentUserId = sessionManager.getUserId() ?: ""
 
     Scaffold(
+        containerColor = ProColors.Background,
         bottomBar = {
             BottomBar(navController = navController)
         }
@@ -59,12 +62,16 @@ fun BottomBar(navController: NavHostController) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    NavigationBar {
+    NavigationBar(
+        containerColor = ProColors.Surface,
+        contentColor = ProColors.Secondary
+    ) {
         screens.forEach { screen ->
+            val isSelected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
             NavigationBarItem(
                 label = { Text(text = screen.title) },
                 icon = { Icon(imageVector = screen.icon, contentDescription = "Navigation icon") },
-                selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true,
+                selected = isSelected,
                 onClick = {
                     navController.navigate(screen.route) {
                         popUpTo(navController.graph.findStartDestination().id) {
@@ -73,7 +80,14 @@ fun BottomBar(navController: NavHostController) {
                         launchSingleTop = true
                         restoreState = true
                     }
-                }
+                },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = ProColors.OnPrimary,
+                    selectedTextColor = ProColors.PrimaryVariant,
+                    indicatorColor = ProColors.Primary,
+                    unselectedIconColor = ProColors.TextTertiary,
+                    unselectedTextColor = ProColors.TextTertiary
+                )
             )
         }
     }

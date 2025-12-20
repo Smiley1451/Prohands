@@ -71,7 +71,7 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, loginSuccess = false, mfaRequired = false)
             try {
-                val response = authApi.login(LoginRequest(email, password))
+                val response = authApi.login(LoginRequest(email.trim(), password))
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
                     if (body.mfaRequired) {
@@ -101,7 +101,8 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, loginSuccess = false)
             try {
-                val response = authApi.verifyMfa(MfaRequest(email, otp))
+                // Trim OTP to prevent whitespace errors
+                val response = authApi.verifyMfa(MfaRequest(email, otp.trim()))
                 if (response.isSuccessful && response.body() != null) {
                     val body = response.body()!!
 
@@ -162,7 +163,8 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, verifySuccess = false)
             try {
-                val response = authApi.verifyAccount(VerifyAccountRequest(email, otp))
+                // Trim OTP to prevent whitespace errors
+                val response = authApi.verifyAccount(VerifyAccountRequest(email, otp.trim()))
                 if (response.isSuccessful) {
                     _state.value = _state.value.copy(isLoading = false, verifySuccess = true)
                 } else {
@@ -179,7 +181,7 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
          viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null, passwordResetRequestSuccess = false, emailForVerification = email)
             try {
-                val response = authApi.requestPasswordReset(email)
+                val response = authApi.requestPasswordReset(email.trim())
                 if (response.isSuccessful) {
                     _state.value = _state.value.copy(isLoading = false, passwordResetRequestSuccess = true)
                 } else {
@@ -203,7 +205,8 @@ class AuthViewModel(private val sessionManager: SessionManager) : ViewModel() {
         viewModelScope.launch {
              _state.value = _state.value.copy(isLoading = true, error = null, passwordResetSuccess = false)
             try {
-                val response = authApi.resetPassword(ResetPasswordRequest(email, otp, newPassword))
+                // Trim OTP
+                val response = authApi.resetPassword(ResetPasswordRequest(email, otp.trim(), newPassword))
                  if (response.isSuccessful) {
                     _state.value = _state.value.copy(isLoading = false, passwordResetSuccess = true)
                 } else {

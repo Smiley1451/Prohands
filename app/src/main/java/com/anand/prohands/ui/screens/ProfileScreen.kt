@@ -54,7 +54,7 @@ fun ProfileScreen(
     }
 
     Scaffold(
-        containerColor = ProColors.SurfaceBg
+        containerColor = ProColors.SurfaceVariant
     ) { paddingValues ->
         Box(
             modifier = Modifier
@@ -63,7 +63,7 @@ fun ProfileScreen(
             contentAlignment = Alignment.Center
         ) {
             when {
-                isLoading -> CircularProgressIndicator(color = ProColors.PrimaryBlue)
+                isLoading -> CircularProgressIndicator(color = ProColors.Primary)
                 error != null -> ErrorView(error) { viewModel.fetchProfile(userId) }
                 profile != null -> ProfileContent(profile!!, isReadOnly, onEditProfile, { viewModel.fetchProfile(userId) }, onLogout)
             }
@@ -74,16 +74,16 @@ fun ProfileScreen(
 @Composable
 fun ErrorView(error: String?, onRefresh: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = Color.Red, modifier = Modifier.size(48.dp))
+        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ProColors.Error, modifier = Modifier.size(48.dp))
         Spacer(modifier = Modifier.height(8.dp))
         Text("Unable to load profile", style = MaterialTheme.typography.titleMedium)
         Text(error ?: "Unknown error", color = ProColors.TextSecondary, textAlign = TextAlign.Center)
         Spacer(modifier = Modifier.height(16.dp))
         Button(
             onClick = onRefresh,
-            colors = ButtonDefaults.buttonColors(containerColor = ProColors.PrimaryBlue)
+            colors = ButtonDefaults.buttonColors(containerColor = ProColors.Primary)
         ) {
-            Text("Try Again")
+            Text("Try Again", color = ProColors.OnPrimary)
         }
     }
 }
@@ -115,19 +115,18 @@ fun ModernHeroHeader(profile: ClientProfileDto) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(280.dp) // Height to accommodate header + overlap
+            .height(280.dp) 
     ) {
         // --- UPDATED BANNER ---
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(200.dp) // The blue area height
-                // This clip creates the "Radial" / Curved bottom effect
+                .height(200.dp) 
                 .clip(RoundedCornerShape(bottomStart = 48.dp, bottomEnd = 48.dp))
                 .background(
                     Brush.verticalGradient(
-                        // Solid Dark Blue Gradient
-                        colors = listOf(ProColors.DeepBlue, ProColors.VividBlue)
+                        // Yellow/Gold Gradient
+                        colors = listOf(ProColors.PrimaryVariant, ProColors.Primary)
                     )
                 )
         )
@@ -136,7 +135,7 @@ fun ModernHeroHeader(profile: ClientProfileDto) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 60.dp), // Push content down to overlap properly
+                .padding(top = 60.dp), 
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Avatar with Ring
@@ -150,7 +149,7 @@ fun ModernHeroHeader(profile: ClientProfileDto) {
                     modifier = Modifier
                         .size(124.dp)
                         .clip(CircleShape)
-                        .border(4.dp, ProColors.White, CircleShape) // Crisp white border
+                        .border(4.dp, ProColors.Surface, CircleShape) 
                         .shadow(elevation = 10.dp, shape = CircleShape)
                 )
 
@@ -158,12 +157,12 @@ fun ModernHeroHeader(profile: ClientProfileDto) {
                     Icon(
                         imageVector = Icons.Default.WorkspacePremium,
                         contentDescription = "Recommended",
-                        tint = ProColors.Gold,
+                        tint = ProColors.PrimaryVariant,
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
                             .offset(x = (-4).dp, y = (-4).dp)
                             .size(32.dp)
-                            .background(ProColors.White, CircleShape)
+                            .background(ProColors.Surface, CircleShape)
                             .padding(4.dp)
                     )
                 }
@@ -177,14 +176,14 @@ fun ModernHeroHeader(profile: ClientProfileDto) {
                     text = profile.name ?: "User",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = ProColors.TextPrimary
+                    color = ProColors.OnBackground
                 )
                 if (profile.experienceLevel.equals("Expert", true) || profile.experienceLevel.equals("Intermediate", true)) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Icon(
                         imageVector = Icons.Default.Verified,
                         contentDescription = "Verified",
-                        tint = ProColors.PrimaryBlue,
+                        tint = ProColors.Primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -200,32 +199,20 @@ fun ModernHeroHeader(profile: ClientProfileDto) {
 }
 
 @Composable
-fun StatItem(value: String, label: String, icon: ImageVector, iconColor: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(text = value, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = ProColors.TextPrimary)
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(imageVector = icon, contentDescription = null, tint = iconColor, modifier = Modifier.size(16.dp))
-        }
-        Text(text = label, fontSize = 12.sp, color = ProColors.TextSecondary)
-    }
-}
-
-@Composable
 fun AiInsightCard(profile: ClientProfileDto) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 8.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFEFF6FF)),
-        border = BorderStroke(1.dp, Color(0xFFDBEAFE)),
+        colors = CardDefaults.cardColors(containerColor = ProColors.Surface),
+        border = BorderStroke(1.dp, ProColors.Divider),
         shape = RoundedCornerShape(12.dp)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = ProColors.PrimaryBlue, modifier = Modifier.size(20.dp))
+                Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = ProColors.Primary, modifier = Modifier.size(20.dp))
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("AI Profile Insights", fontWeight = FontWeight.Bold, color = ProColors.VividBlue)
+                Text("AI Profile Insights", fontWeight = FontWeight.Bold, color = ProColors.PrimaryVariant)
             }
             Spacer(modifier = Modifier.height(8.dp))
             Text(
@@ -240,11 +227,11 @@ fun AiInsightCard(profile: ClientProfileDto) {
                     profile.topReviewKeywords.take(3).forEach { keyword ->
                         Text(
                             text = "#$keyword",
-                            color = ProColors.VividBlue,
+                            color = ProColors.PrimaryVariant,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier
-                                .background(Color.White, RoundedCornerShape(4.dp))
+                                .background(ProColors.SurfaceVariant, RoundedCornerShape(4.dp))
                                 .padding(horizontal = 6.dp, vertical = 2.dp)
                         )
                     }
@@ -270,7 +257,7 @@ fun SkillsSection(profile: ClientProfileDto) {
                     AssistChip(
                         onClick = {},
                         label = { Text(skill, color = ProColors.TextPrimary) },
-                        border = BorderStroke(1.dp, Color.LightGray)
+                        border = BorderStroke(1.dp, ProColors.Divider)
                     )
                 }
             }
@@ -292,14 +279,14 @@ fun TrustMetricsGrid(profile: ClientProfileDto) {
                 title = "Trust Score",
                 value = "${profile.profileStrengthScore ?: 0}/100",
                 icon = Icons.Default.Shield,
-                color = ProColors.PrimaryBlue
+                color = ProColors.Primary
             )
             TrustCard(
                 modifier = Modifier.weight(1f),
                 title = "Jobs Done",
                 value = "${profile.totalReviews}",
                 icon = Icons.Default.WorkHistory,
-                color = ProColors.Gold
+                color = ProColors.PrimaryVariant
             )
         }
         Spacer(modifier = Modifier.height(12.dp))
@@ -320,7 +307,7 @@ fun TrustMetricsGrid(profile: ClientProfileDto) {
                 title = "Location",
                 value = "View Map",
                 icon = Icons.Default.LocationOn,
-                color = Color(0xFFE11D48)
+                color = ProColors.Error // Keep red for location pin if desired, or change to neutral
             )
         }
     }
@@ -336,7 +323,7 @@ fun TrustCard(
 ) {
     Card(
         modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = ProColors.White),
+        colors = CardDefaults.cardColors(containerColor = ProColors.Surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -375,18 +362,18 @@ fun ProfileActions(
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Main Action: Edit Profile (Takes up most space)
+        // Main Action: Edit Profile
         Button(
             onClick = onEditProfile,
             modifier = Modifier
                 .weight(1f)
                 .height(50.dp),
             shape = RoundedCornerShape(12.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = ProColors.PrimaryBlue)
+            colors = ButtonDefaults.buttonColors(containerColor = ProColors.Primary)
         ) {
-            Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.Outlined.Edit, contentDescription = null, modifier = Modifier.size(18.dp), tint = ProColors.OnPrimary)
             Spacer(modifier = Modifier.width(8.dp))
-            Text("Edit Profile")
+            Text("Edit Profile", color = ProColors.OnPrimary)
         }
 
         // Secondary Action: Refresh
@@ -394,50 +381,20 @@ fun ProfileActions(
             onClick = onRefresh,
             modifier = Modifier.size(50.dp),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, ProColors.PrimaryBlue.copy(alpha = 0.5f)),
+            border = BorderStroke(1.dp, ProColors.Primary.copy(alpha = 0.5f)),
             contentPadding = PaddingValues(0.dp)
         ) {
-            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = ProColors.PrimaryBlue)
+            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh", tint = ProColors.Primary)
         }
 
-        // Destructive/Secondary Action: Logout
+        // Destructive Action: Logout
         OutlinedIconButton(
             onClick = onLogout,
             modifier = Modifier.size(50.dp),
             shape = RoundedCornerShape(12.dp),
-            border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.2f))
+            border = BorderStroke(1.dp, ProColors.Error.copy(alpha = 0.2f))
         ) {
-            Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = "Logout", tint = Color.Red)
+            Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = "Logout", tint = ProColors.Error)
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun ProfileScreenPreviewEnhanced() {
-    val dummyProfile = ClientProfileDto(
-        userId = "anand1234",
-        name = "Anand J",
-        email = "anand@example.com",
-        phone = "1234567890",
-        profilePictureUrl = null,
-        experienceLevel = "Expert",
-        recommendationFlag = true,
-        averageRating = 4.9,
-        jobSuccessRate = 98.0,
-        recommendedWagePerHour = 25.0,
-        aiGeneratedSummary = "Anand is a highly rated expert with consistent 5-star reviews in system design. Clients praise his punctuality and problem-solving skills.",
-        topReviewKeywords = listOf("Punctual", "Fast", "Reliable"),
-        skills = listOf("Android", "Kotlin", "System Design", "Compose"),
-        profileStrengthScore = 92,
-        totalReviews = 145,
-        latitude = 0.0,
-        longitude = 0.0,
-        createdAt = "2023-01-15",
-        lastAiUpdate = "2023-10-27",
-        profileCompletionPercent = 100
-    )
-    MaterialTheme {
-        ProfileScreen(userId = "anand1234", isReadOnly = false)
     }
 }

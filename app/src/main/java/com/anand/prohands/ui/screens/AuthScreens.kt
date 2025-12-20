@@ -32,19 +32,15 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.AuthViewModel
-
-// Colors based on description
-val LightBlueBg = Color(0xFFE0F7FA) // Cyan-ish light blue
-val GoldYellow = Color(0xFFFFD700)
-val OrangeGold = Color(0xFFFFB300)
 
 @Composable
 fun AuthBackground(content: @Composable BoxScope.() -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(LightBlueBg)
+            .background(Color(0xFFE0F7FA)) // Keeping LightBlueBg locally as it's specific to Auth Background
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val width = size.width
@@ -65,7 +61,7 @@ fun AuthBackground(content: @Composable BoxScope.() -> Unit) {
             drawPath(
                 path = pathTop,
                 brush = Brush.verticalGradient(
-                    colors = listOf(GoldYellow, OrangeGold)
+                    colors = listOf(ProColors.Primary, ProColors.PrimaryVariant)
                 )
             )
 
@@ -84,7 +80,7 @@ fun AuthBackground(content: @Composable BoxScope.() -> Unit) {
             drawPath(
                 path = pathBottom,
                 brush = Brush.verticalGradient(
-                    colors = listOf(OrangeGold, GoldYellow)
+                    colors = listOf(ProColors.PrimaryVariant, ProColors.Primary)
                 )
             )
         }
@@ -101,7 +97,7 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
+    val state by viewModel.state.collectAsState() 
     
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -118,14 +114,13 @@ fun LoginScreen(
     LaunchedEffect(state.mfaRequired) {
         if (state.mfaRequired) {
             onNavigateToVerifyMfa()
-            // State is preserved in ViewModel for verification
         }
     }
 
     LaunchedEffect(state.error) {
         state.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.clearStatusFlags() // Clear error after showing it
+            viewModel.clearStatusFlags()
         }
     }
 
@@ -141,7 +136,7 @@ fun LoginScreen(
                 text = "Login",
                 fontSize = 48.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = ProColors.Secondary, // Black
                 modifier = Modifier.padding(bottom = 48.dp)
             )
 
@@ -149,15 +144,15 @@ fun LoginScreen(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = ProColors.PrimaryVariant) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
             )
@@ -168,8 +163,8 @@ fun LoginScreen(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ProColors.PrimaryVariant) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -183,10 +178,10 @@ fun LoginScreen(
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
             )
@@ -204,7 +199,6 @@ fun LoginScreen(
 
             Button(
                 onClick = { 
-                    // STABILITY FIX: Validate input before calling VM
                     if (email.isNotBlank() && password.isNotBlank()) {
                         viewModel.login(email, password)
                     } else {
@@ -222,14 +216,14 @@ fun LoginScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(colors = listOf(OrangeGold, GoldYellow))
+                            Brush.horizontalGradient(colors = listOf(ProColors.PrimaryVariant, ProColors.Primary))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.Secondary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("LOGIN", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("LOGIN", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ProColors.Secondary)
                     }
                 }
             }
@@ -245,15 +239,12 @@ fun LoginScreen(
                 Text(
                     text = "Sign Up",
                     fontSize = 14.sp,
-                    color = OrangeGold,
+                    color = ProColors.PrimaryVariant,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onNavigateToSignUp() }
                 )
             }
         }
-
-        // Removed the confusing loginSuccess && isLoading overlay logic. 
-        // The main content's CircularProgressIndicator (inside the button) is sufficient.
     }
 }
 
@@ -275,7 +266,7 @@ fun SignUpScreen(
     onNavigateToVerify: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
+    val state by viewModel.state.collectAsState()
 
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -288,14 +279,13 @@ fun SignUpScreen(
         if (state.signupSuccess) {
             Toast.makeText(context, "Sign Up Successful! Please Verify Account.", Toast.LENGTH_SHORT).show()
             onNavigateToVerify()
-            // Do not reset state immediately so email is preserved
         }
     }
 
     LaunchedEffect(state.error) {
         state.error?.let {
             Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-            viewModel.clearStatusFlags() // Clear error after showing it
+            viewModel.clearStatusFlags()
         }
     }
 
@@ -311,7 +301,7 @@ fun SignUpScreen(
                 text = "Create an account",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = ProColors.Secondary,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -319,15 +309,15 @@ fun SignUpScreen(
                 value = username,
                 onValueChange = { username = it },
                 label = { Text("Name") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null, tint = ProColors.PrimaryVariant) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 )
             )
             
@@ -337,15 +327,15 @@ fun SignUpScreen(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = ProColors.PrimaryVariant) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next)
             )
@@ -356,8 +346,8 @@ fun SignUpScreen(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Password") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ProColors.PrimaryVariant) },
                 trailingIcon = {
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(
@@ -371,10 +361,10 @@ fun SignUpScreen(
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next)
             )
@@ -385,8 +375,8 @@ fun SignUpScreen(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it },
                 label = { Text("Confirm Password") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ProColors.PrimaryVariant) },
                  trailingIcon = {
                     IconButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
                         Icon(
@@ -400,10 +390,10 @@ fun SignUpScreen(
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
             )
@@ -412,7 +402,6 @@ fun SignUpScreen(
 
             Button(
                 onClick = {
-                    // STABILITY FIX: Validate all fields are non-empty and passwords match
                     when {
                         username.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() -> {
                             Toast.makeText(context, "All fields are required", Toast.LENGTH_SHORT).show()
@@ -436,14 +425,14 @@ fun SignUpScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(colors = listOf(OrangeGold, GoldYellow))
+                            Brush.horizontalGradient(colors = listOf(ProColors.PrimaryVariant, ProColors.Primary))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.Secondary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("SIGN UP", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("SIGN UP", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ProColors.Secondary)
                     }
                 }
             }
@@ -459,7 +448,7 @@ fun SignUpScreen(
                 Text(
                     text = "Login",
                     fontSize = 14.sp,
-                    color = OrangeGold,
+                    color = ProColors.PrimaryVariant,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onNavigateToLogin() }
                 )
@@ -483,7 +472,7 @@ fun VerifyAccountScreen(
     onNavigateToLogin: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
+    val state by viewModel.state.collectAsState()
     var otp by remember { mutableStateOf("") }
 
     LaunchedEffect(state.verifySuccess) {
@@ -497,7 +486,7 @@ fun VerifyAccountScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-             viewModel.clearStatusFlags() // Clear error after showing it
+             viewModel.clearStatusFlags()
         }
     }
 
@@ -513,7 +502,7 @@ fun VerifyAccountScreen(
                 text = "Verify Account",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = ProColors.Secondary,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
             
@@ -528,14 +517,14 @@ fun VerifyAccountScreen(
                 value = otp,
                 onValueChange = { otp = it },
                 label = { Text("OTP") },
-                textStyle = TextStyle(color = Color.Black),
+                textStyle = TextStyle(color = ProColors.OnBackground),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
             )
@@ -544,7 +533,6 @@ fun VerifyAccountScreen(
             
              Button(
                 onClick = { 
-                    // STABILITY FIX: Validate OTP length
                     if (otp.length == 6) {
                         viewModel.verifyAccount(otp)
                     } else {
@@ -562,14 +550,14 @@ fun VerifyAccountScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(colors = listOf(OrangeGold, GoldYellow))
+                            Brush.horizontalGradient(colors = listOf(ProColors.PrimaryVariant, ProColors.Primary))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.Secondary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("VERIFY", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("VERIFY", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ProColors.Secondary)
                     }
                 }
             }
@@ -591,7 +579,7 @@ fun VerifyMfaScreen(
     onLoginSuccess: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
+    val state by viewModel.state.collectAsState()
     var otp by remember { mutableStateOf("") }
 
     LaunchedEffect(state.loginSuccess) {
@@ -605,7 +593,7 @@ fun VerifyMfaScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-             viewModel.clearStatusFlags() // Clear error after showing it
+             viewModel.clearStatusFlags()
         }
     }
 
@@ -621,7 +609,7 @@ fun VerifyMfaScreen(
                 text = "MFA Verification",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = ProColors.Secondary,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
             
@@ -636,14 +624,14 @@ fun VerifyMfaScreen(
                 value = otp,
                 onValueChange = { otp = it },
                 label = { Text("OTP") },
-                textStyle = TextStyle(color = Color.Black),
+                textStyle = TextStyle(color = ProColors.OnBackground),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done)
             )
@@ -652,7 +640,6 @@ fun VerifyMfaScreen(
             
              Button(
                 onClick = { 
-                    // STABILITY FIX: Validate OTP length
                     if (otp.length == 6) {
                         viewModel.verifyMfa(otp)
                     } else {
@@ -670,14 +657,14 @@ fun VerifyMfaScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(colors = listOf(OrangeGold, GoldYellow))
+                            Brush.horizontalGradient(colors = listOf(ProColors.PrimaryVariant, ProColors.Primary))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.Secondary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("VERIFY MFA", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("VERIFY MFA", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ProColors.Secondary)
                     }
                 }
             }
@@ -691,7 +678,7 @@ fun ForgotPasswordScreen(
     onNavigateToResetPassword: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
+    val state by viewModel.state.collectAsState()
     var email by remember { mutableStateOf("") }
 
     LaunchedEffect(state.passwordResetRequestSuccess) {
@@ -704,7 +691,7 @@ fun ForgotPasswordScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-             viewModel.clearStatusFlags() // Clear error after showing it
+             viewModel.clearStatusFlags()
         }
     }
 
@@ -720,7 +707,7 @@ fun ForgotPasswordScreen(
                 text = "Forgot Password",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = ProColors.Secondary,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
 
@@ -728,15 +715,15 @@ fun ForgotPasswordScreen(
                 value = email,
                 onValueChange = { email = it },
                 label = { Text("Email") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Email, contentDescription = null, tint = ProColors.PrimaryVariant) },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Done)
             )
@@ -745,7 +732,6 @@ fun ForgotPasswordScreen(
             
              Button(
                 onClick = { 
-                    // STABILITY FIX: Validate email is not empty
                     if (email.isNotBlank()) {
                          viewModel.requestPasswordReset(email)
                     } else {
@@ -763,14 +749,14 @@ fun ForgotPasswordScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(colors = listOf(OrangeGold, GoldYellow))
+                            Brush.horizontalGradient(colors = listOf(ProColors.PrimaryVariant, ProColors.Primary))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.Secondary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("SEND OTP", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("SEND OTP", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ProColors.Secondary)
                     }
                 }
             }
@@ -792,7 +778,7 @@ fun ResetPasswordScreen(
     onNavigateToLogin: () -> Unit
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState() // **Fix: Use collectAsState for StateFlow**
+    val state by viewModel.state.collectAsState()
     var otp by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
     var newPasswordVisible by remember { mutableStateOf(false) }
@@ -809,7 +795,7 @@ fun ResetPasswordScreen(
     LaunchedEffect(state.error) {
         state.error?.let {
              Toast.makeText(context, it, Toast.LENGTH_LONG).show()
-             viewModel.clearStatusFlags() // Clear error after showing it
+             viewModel.clearStatusFlags()
         }
     }
 
@@ -825,7 +811,7 @@ fun ResetPasswordScreen(
                 text = "Reset Password",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = Color.Black,
+                color = ProColors.Secondary,
                 modifier = Modifier.padding(bottom = 32.dp)
             )
             
@@ -840,14 +826,14 @@ fun ResetPasswordScreen(
                 value = otp,
                 onValueChange = { otp = it },
                 label = { Text("OTP") },
-                textStyle = TextStyle(color = Color.Black),
+                textStyle = TextStyle(color = ProColors.OnBackground),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next)
             )
@@ -858,8 +844,8 @@ fun ResetPasswordScreen(
                 value = newPassword,
                 onValueChange = { newPassword = it },
                 label = { Text("New Password") },
-                textStyle = TextStyle(color = Color.Black),
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = OrangeGold) },
+                textStyle = TextStyle(color = ProColors.OnBackground),
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = ProColors.PrimaryVariant) },
                  trailingIcon = {
                     IconButton(onClick = { newPasswordVisible = !newPasswordVisible }) {
                         Icon(
@@ -873,10 +859,10 @@ fun ResetPasswordScreen(
                 visualTransformation = if (newPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeGold,
+                    focusedBorderColor = ProColors.PrimaryVariant,
                     unfocusedBorderColor = Color.Gray,
-                    focusedLabelColor = OrangeGold,
-                    cursorColor = Color.Black
+                    focusedLabelColor = ProColors.PrimaryVariant,
+                    cursorColor = ProColors.Secondary
                 ),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done)
             )
@@ -885,7 +871,6 @@ fun ResetPasswordScreen(
             
              Button(
                 onClick = { 
-                    // STABILITY FIX: Validate input is not empty and OTP length
                     when {
                         otp.length != 6 -> {
                             Toast.makeText(context, "OTP must be 6 digits", Toast.LENGTH_SHORT).show()
@@ -909,14 +894,14 @@ fun ResetPasswordScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            Brush.horizontalGradient(colors = listOf(OrangeGold, GoldYellow))
+                            Brush.horizontalGradient(colors = listOf(ProColors.PrimaryVariant, ProColors.Primary))
                         ),
                     contentAlignment = Alignment.Center
                 ) {
                     if (state.isLoading) {
-                        CircularProgressIndicator(color = Color.Black, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.Secondary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("RESET PASSWORD", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = Color.Black)
+                        Text("RESET PASSWORD", fontSize = 18.sp, fontWeight = FontWeight.Bold, color = ProColors.Secondary)
                     }
                 }
             }

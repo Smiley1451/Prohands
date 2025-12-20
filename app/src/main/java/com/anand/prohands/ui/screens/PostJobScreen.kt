@@ -20,8 +20,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.anand.prohands.data.JobRequest
 import com.anand.prohands.ui.components.MapPickerComponent
-import com.anand.prohands.ui.theme.BrandBlue
-import com.anand.prohands.ui.theme.BgLight
 import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.PostJobViewModel
 import com.anand.prohands.viewmodel.PostJobViewModelFactory
@@ -59,16 +57,16 @@ fun PostJobScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Create New Job", color = BrandBlue, fontWeight = FontWeight.Bold) },
+                title = { Text("Create New Job", color = ProColors.OnPrimary, fontWeight = FontWeight.Bold) },
                 navigationIcon = {
                     IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = BrandBlue)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ProColors.OnPrimary)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.White)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = ProColors.Primary)
             )
         },
-        containerColor = BgLight
+        containerColor = ProColors.Background
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -85,9 +83,11 @@ fun PostJobScreen(
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = ProColors.TextPrimary,
-                        unfocusedTextColor = ProColors.TextPrimary,
-                        cursorColor = BrandBlue
+                        focusedTextColor = ProColors.OnBackground,
+                        unfocusedTextColor = ProColors.OnBackground,
+                        cursorColor = ProColors.Primary,
+                        focusedBorderColor = ProColors.Primary,
+                        focusedLabelColor = ProColors.Primary
                     )
                 )
             }
@@ -102,9 +102,11 @@ fun PostJobScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = ProColors.TextPrimary,
-                            unfocusedTextColor = ProColors.TextPrimary,
-                            cursorColor = BrandBlue
+                            focusedTextColor = ProColors.OnBackground,
+                            unfocusedTextColor = ProColors.OnBackground,
+                            cursorColor = ProColors.Primary,
+                            focusedBorderColor = ProColors.Primary,
+                            focusedLabelColor = ProColors.Primary
                         )
                     )
                     OutlinedTextField(
@@ -115,9 +117,11 @@ fun PostJobScreen(
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = ProColors.TextPrimary,
-                            unfocusedTextColor = ProColors.TextPrimary,
-                            cursorColor = BrandBlue
+                            focusedTextColor = ProColors.OnBackground,
+                            unfocusedTextColor = ProColors.OnBackground,
+                            cursorColor = ProColors.Primary,
+                            focusedBorderColor = ProColors.Primary,
+                            focusedLabelColor = ProColors.Primary
                         )
                     )
                 }
@@ -132,9 +136,11 @@ fun PostJobScreen(
                     minLines = 3,
                     maxLines = 5,
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = ProColors.TextPrimary,
-                        unfocusedTextColor = ProColors.TextPrimary,
-                        cursorColor = BrandBlue
+                        focusedTextColor = ProColors.OnBackground,
+                        unfocusedTextColor = ProColors.OnBackground,
+                        cursorColor = ProColors.Primary,
+                        focusedBorderColor = ProColors.Primary,
+                        focusedLabelColor = ProColors.Primary
                     )
                 )
             }
@@ -166,14 +172,14 @@ fun PostJobScreen(
                         }
                     },
                     modifier = Modifier.fillMaxWidth().height(50.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = BrandBlue),
+                    colors = ButtonDefaults.buttonColors(containerColor = ProColors.Primary),
                     shape = RoundedCornerShape(8.dp),
                     enabled = !isLoading
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = ProColors.OnPrimary, modifier = Modifier.size(24.dp))
                     } else {
-                        Text("Post Job", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        Text("Post Job", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = ProColors.OnPrimary)
                     }
                 }
             }

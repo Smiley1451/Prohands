@@ -7,14 +7,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.anand.prohands.ui.theme.ProColors
 
 @Composable
 fun SearchScreen() {
     Box(
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        Text(text = "Search Screen")
+        Text(text = "Search Screen", color = ProColors.TextSecondary)
     }
 }
 
