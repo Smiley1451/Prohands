@@ -1,22 +1,27 @@
 package com.anand.prohands.ui.screens
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
+import android.location.Location
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
+import androidx.compose.material.icons.automirrored.outlined.Message
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,17 +30,28 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.anand.prohands.data.ClientProfileDto
+import com.anand.prohands.data.JobResponse
 import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.ProfileViewModel
 import com.anand.prohands.viewmodel.ProfileViewModelFactory
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
+import kotlinx.coroutines.launch
 
 @Composable
 fun ProfileScreen(
@@ -43,14 +59,58 @@ fun ProfileScreen(
     isReadOnly: Boolean,
     onEditProfile: () -> Unit = {},
     onLogout: () -> Unit = {},
+    onMessageClick: () -> Unit = {},
+    onJobClick: (String) -> Unit = {},
     viewModel: ProfileViewModel = viewModel(factory = ProfileViewModelFactory())
 ) {
     val profile by viewModel.profile.collectAsState()
+    val nearbyJobs by viewModel.nearbyJobs.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
 
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    
+    // Check and request location permissions
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val fineLocation = permissions[Manifest.permission.ACCESS_FINE_LOCATION] ?: false
+        val coarseLocation = permissions[Manifest.permission.ACCESS_COARSE_LOCATION] ?: false
+        
+        if (fineLocation || coarseLocation) {
+             getCurrentLocation(context) { location ->
+                 viewModel.fetchNearbyJobs(location.latitude, location.longitude)
+             }
+        }
+    }
+
     LaunchedEffect(userId) {
         viewModel.fetchProfile(userId)
+    }
+
+    // Attempt to get current location if user location is missing or if we just want to ensure we have it for the map
+    LaunchedEffect(Unit) {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED &&
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED
+        ) {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        } else {
+             getCurrentLocation(context) { location ->
+                 // If the profile doesn't have a location, or even if it does, 
+                 // we might want to prioritize current location for "Nearby Jobs" 
+                 // or update the view model's concept of "current location" for the map center.
+                 // For now, let's just ensure we fetch jobs around the current location 
+                 // if the profile location was missing or old.
+                 // Ideally, we compare or just use current.
+                 viewModel.fetchNearbyJobs(location.latitude, location.longitude)
+             }
+        }
     }
 
     Scaffold(
@@ -65,9 +125,26 @@ fun ProfileScreen(
             when {
                 isLoading -> CircularProgressIndicator(color = ProColors.Primary)
                 error != null -> ErrorView(error) { viewModel.fetchProfile(userId) }
-                profile != null -> ProfileContent(profile!!, isReadOnly, onEditProfile, { viewModel.fetchProfile(userId) }, onLogout)
+                profile != null -> ProfileContent(profile!!, nearbyJobs, isReadOnly, onEditProfile, { viewModel.fetchProfile(userId) }, onLogout, onMessageClick, onJobClick)
             }
         }
+    }
+}
+
+private fun getCurrentLocation(context: Context, onLocationResult: (Location) -> Unit) {
+    val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+    try {
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        ) {
+            fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                location?.let {
+                    onLocationResult(it)
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }
 
@@ -91,10 +168,13 @@ fun ErrorView(error: String?, onRefresh: () -> Unit) {
 @Composable
 fun ProfileContent(
     profile: ClientProfileDto,
+    nearbyJobs: List<JobResponse>,
     isReadOnly: Boolean,
     onEditProfile: () -> Unit,
     onRefresh: () -> Unit,
-    onLogout: () -> Unit
+    onLogout: () -> Unit,
+    onMessageClick: () -> Unit,
+    onJobClick: (String) -> Unit
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -103,9 +183,11 @@ fun ProfileContent(
         item { ModernHeroHeader(profile) }
         item { AiInsightCard(profile) }
         item { SkillsSection(profile) }
-        item { TrustMetricsGrid(profile) }
+        item { TrustMetricsGrid(profile, nearbyJobs, onJobClick) }
         if (!isReadOnly) {
             item { ProfileActions(onEditProfile, onRefresh, onLogout) }
+        } else {
+            item { WorkerActions(onMessageClick) }
         }
     }
 }
@@ -266,7 +348,7 @@ fun SkillsSection(profile: ClientProfileDto) {
 }
 
 @Composable
-fun TrustMetricsGrid(profile: ClientProfileDto) {
+fun TrustMetricsGrid(profile: ClientProfileDto, nearbyJobs: List<JobResponse>, onJobClick: (String) -> Unit) {
     Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         SectionTitle("Activity & Trust")
         
@@ -301,14 +383,126 @@ fun TrustMetricsGrid(profile: ClientProfileDto) {
                 icon = Icons.Default.CalendarMonth,
                 color = ProColors.TextSecondary
             )
-             // Placeholder for Location or other stat
-            TrustCard(
+            
+            // Location Card with Map Interaction
+            LocationMapCard(
                 modifier = Modifier.weight(1f),
-                title = "Location",
-                value = "View Map",
-                icon = Icons.Default.LocationOn,
-                color = ProColors.Error // Keep red for location pin if desired, or change to neutral
+                profile = profile,
+                nearbyJobs = nearbyJobs,
+                onJobClick = onJobClick
             )
+        }
+    }
+}
+
+@Composable
+fun LocationMapCard(
+    modifier: Modifier, 
+    profile: ClientProfileDto, 
+    nearbyJobs: List<JobResponse>,
+    onJobClick: (String) -> Unit
+) {
+    var showMapDialog by remember { mutableStateOf(false) }
+    var currentUserLocation by remember { mutableStateOf<LatLng?>(null) }
+    val context = LocalContext.current
+    
+    // Fetch current location when the card is clicked or component loads
+    LaunchedEffect(showMapDialog) {
+        if (showMapDialog) {
+             getCurrentLocation(context) { location ->
+                 currentUserLocation = LatLng(location.latitude, location.longitude)
+             }
+        }
+    }
+
+    Card(
+        modifier = modifier.clickable { showMapDialog = true },
+        colors = CardDefaults.cardColors(containerColor = ProColors.Surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+            Icon(Icons.Default.LocationOn, contentDescription = null, tint = ProColors.Error, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+            Text("View Map", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = ProColors.TextPrimary)
+            Text("Location", fontSize = 12.sp, color = ProColors.TextSecondary)
+        }
+    }
+
+    if (showMapDialog) {
+        val userLocation = currentUserLocation ?: if (profile.latitude != null && profile.longitude != null) {
+            LatLng(profile.latitude, profile.longitude)
+        } else {
+            // Default to India/Bengaluru if nothing available, rather than SF
+            LatLng(12.9716, 77.5946) 
+        }
+
+        val cameraPositionState = rememberCameraPositionState {
+            position = CameraPosition.fromLatLngZoom(userLocation, 12f)
+        }
+        
+        // Update camera when location is found
+        LaunchedEffect(currentUserLocation) {
+             currentUserLocation?.let {
+                 cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(it, 14f))
+             }
+        }
+
+        Dialog(onDismissRequest = { showMapDialog = false }) {
+            Card(
+                 shape = RoundedCornerShape(16.dp),
+                 modifier = Modifier.fillMaxWidth().height(500.dp)
+            ) {
+                 Column {
+                    Box(modifier = Modifier.weight(1f)) {
+                        GoogleMap(
+                            modifier = Modifier.fillMaxSize(),
+                            cameraPositionState = cameraPositionState,
+                            properties = MapProperties(isMyLocationEnabled = true), // Enable the blue dot
+                            uiSettings = MapUiSettings(myLocationButtonEnabled = true) // Enable the "go to my location" button
+                        ) {
+                            // User Profile Location Marker (static registered address)
+                            if (profile.latitude != null && profile.longitude != null) {
+                                Marker(
+                                    state = MarkerState(position = LatLng(profile.latitude, profile.longitude)),
+                                    title = "Registered Address",
+                                    snippet = profile.name ?: "User",
+                                    icon = BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE)
+                                )
+                            }
+                            
+                            // Nearby Jobs Markers
+                            nearbyJobs.forEach { job ->
+                                Marker(
+                                    state = MarkerState(position = LatLng(job.latitude, job.longitude)),
+                                    title = job.title,
+                                    snippet = "Wage: $${job.wage}/hr (Click to View)",
+                                    onInfoWindowClick = {
+                                        onJobClick(job.jobId)
+                                        showMapDialog = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Button(
+                            onClick = { showMapDialog = false },
+                            colors = ButtonDefaults.buttonColors(containerColor = ProColors.Primary)
+                        ) {
+                            Text("Close", color = ProColors.OnPrimary)
+                        }
+                    }
+                 }
+            }
         }
     }
 }
@@ -395,6 +589,29 @@ fun ProfileActions(
             border = BorderStroke(1.dp, ProColors.Error.copy(alpha = 0.2f))
         ) {
             Icon(Icons.AutoMirrored.Outlined.Logout, contentDescription = "Logout", tint = ProColors.Error)
+        }
+    }
+}
+
+@Composable
+fun WorkerActions(onMessageClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Button(
+            onClick = onMessageClick,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(50.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = ProColors.Primary)
+        ) {
+            Icon(Icons.AutoMirrored.Outlined.Message, contentDescription = null, modifier = Modifier.size(18.dp), tint = ProColors.OnPrimary)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("Message Worker", color = ProColors.OnPrimary)
         }
     }
 }

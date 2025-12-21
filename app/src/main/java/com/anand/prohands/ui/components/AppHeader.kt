@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Mail
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,44 +30,41 @@ fun AppHeader(
     isHome: Boolean = false,
     profileImageUrl: String? = null,
     onBackClick: (() -> Unit)? = null,
-    onProfileClick: (() -> Unit)? = null
+    onProfileClick: (() -> Unit)? = null,
+    onMessagesClick: (() -> Unit)? = null,
+    onNotificationsClick: (() -> Unit)? = null
 ) {
     Surface(
         color = ProColors.Primary,
         shadowElevation = 4.dp,
-        modifier = Modifier.fillMaxWidth()
+        modifier = Modifier.fillMaxWidth().height(60.dp) // Fixed minimal height
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp), 
+                .fillMaxSize()
+                .padding(horizontal = 16.dp), 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
+            // Left Section
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (!isHome && onBackClick != null) {
-                    IconButton(onClick = onBackClick) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = ProColors.OnPrimary
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                }
-
                 if (isHome) {
-                    // Logo and App Name for Home Screen
-                    // Use a Box to safeguard against potential resource loading issues
-                    Box(modifier = Modifier.size(36.dp).clip(CircleShape).background(ProColors.OnPrimary)) {
-                         Image(
-                             painter = painterResource(id = R.mipmap.ic_launcher), 
-                             contentDescription = "App Logo",
-                             modifier = Modifier.fillMaxSize()
-                         )
-                    }
+                    // Profile Image first (as per request)
+                    AsyncImage(
+                        model = profileImageUrl?.replace("http://", "https://")?.replace(".heic", ".jpg")
+                            ?: "https://via.placeholder.com/150",
+                        contentDescription = "Profile",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(36.dp) 
+                            .clip(CircleShape)
+                            .background(ProColors.Surface)
+                            .border(1.dp, ProColors.Surface, CircleShape)
+                            .clickable { onProfileClick?.invoke() }
+                    )
                     
                     Spacer(modifier = Modifier.width(12.dp))
+                    
                     Text(
                         text = "ProHand's",
                         fontSize = 20.sp,
@@ -73,30 +72,44 @@ fun AppHeader(
                         color = ProColors.OnPrimary
                     )
                 } else {
-                    // Title for other screens
+                    // Back button and Title for other screens
+                    if (onBackClick != null) {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = ProColors.OnPrimary
+                            )
+                        }
+                    }
                     Text(
                         text = title ?: "",
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        color = ProColors.OnPrimary
+                        color = ProColors.OnPrimary,
+                        modifier = Modifier.padding(start = if (onBackClick == null) 0.dp else 4.dp)
                     )
                 }
             }
 
-
-            if (onProfileClick != null) {
-                 AsyncImage(
-                    model = profileImageUrl?.replace("http://", "https://")?.replace(".heic", ".jpg")
-                        ?: "https://via.placeholder.com/150",
-                    contentDescription = "Profile",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
-                        .size(40.dp) 
-                        .clip(CircleShape)
-                        .background(ProColors.Surface)
-                        .border(1.dp, ProColors.Surface, CircleShape)
-                        .clickable { onProfileClick() }
-                )
+            // Right Section
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (isHome) {
+                    IconButton(onClick = { onMessagesClick?.invoke() }) {
+                         Icon(
+                             imageVector = Icons.Default.Mail,
+                             contentDescription = "Messages",
+                             tint = ProColors.OnPrimary
+                         )
+                    }
+                    IconButton(onClick = { onNotificationsClick?.invoke() }) {
+                         Icon(
+                             imageVector = Icons.Default.Notifications,
+                             contentDescription = "Notifications",
+                             tint = ProColors.OnPrimary
+                         )
+                    }
+                }
             }
         }
     }

@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -21,6 +22,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.anand.prohands.network.RetrofitClient
+import com.anand.prohands.services.ChatConnectionService
 import com.anand.prohands.services.LocationForegroundService
 import com.anand.prohands.ui.screens.*
 import com.anand.prohands.ui.theme.ProHandsTheme
@@ -39,7 +41,6 @@ class MainActivity : ComponentActivity() {
             startLocationService()
         } else {
             // Handle the case where the user denies the permission.
-            // You might want to show a message to the user.
         }
     }
 
@@ -47,129 +48,168 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // Get singleton SessionManager
-        val sessionManager = (application as ProHandsApplication).sessionManager
+        try {
+            // Get singleton SessionManager
+            val sessionManager = (application as ProHandsApplication).sessionManager
+            val viewModelFactory = AuthViewModelFactory(sessionManager)
 
-        if (sessionManager.getAuthToken() != null) {
-            requestLocationPermissions()
-        }
+            val userId = sessionManager.getUserId()
+            if (sessionManager.getAuthToken() != null) {
+                requestLocationPermissions()
+                if (userId != null) {
+                    startChatService(userId)
+                }
+            }
 
-        val viewModelFactory = AuthViewModelFactory(sessionManager)
+            setContent {
+                ProHandsTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        val navController = rememberNavController()
+                        val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
 
-        setContent {
-            ProHandsTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    val navController = rememberNavController()
-                    val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
+                        val startDestination = if (sessionManager.getAuthToken() != null) "main" else "login"
 
-                    val startDestination = if (sessionManager.getAuthToken() != null) "main" else "login"
-
-                    NavHost(navController = navController, startDestination = startDestination) {
-                        composable("login") {
-                            LoginScreen(
-                                viewModel = authViewModel,
-                                onNavigateToSignUp = { navController.navigate("signup") },
-                                onNavigateToVerifyMfa = { navController.navigate("verify_mfa") },
-                                onNavigateToForgotPassword = { navController.navigate("forgot_password") },
-                                onLoginSuccess = {
-                                    authViewModel.fetchProfile()
-                                    requestLocationPermissions()
-                                    navController.navigate("main") {
-                                        popUpTo("login") { inclusive = true }
+                        NavHost(navController = navController, startDestination = startDestination) {
+                            composable("login") {
+                                LoginScreen(
+                                    viewModel = authViewModel,
+                                    onNavigateToSignUp = { navController.navigate("signup") },
+                                    onNavigateToVerifyMfa = { navController.navigate("verify_mfa") },
+                                    onNavigateToForgotPassword = { navController.navigate("forgot_password") },
+                                    onLoginSuccess = {
+                                        authViewModel.fetchProfile()
+                                        requestLocationPermissions()
+                                        sessionManager.getUserId()?.let { uid -> startChatService(uid) }
+                                        navController.navigate("main") {
+                                            popUpTo("login") { inclusive = true }
+                                        }
                                     }
-                                }
-                            )
-                        }
-                        composable("signup") {
-                            SignUpScreen(
-                                viewModel = authViewModel,
-                                onNavigateToLogin = { navController.navigate("login") },
-                                onNavigateToVerify = { navController.navigate("verify_account") }
-                            )
-                        }
-                        composable("verify_account") {
-                            VerifyAccountScreen(
-                                viewModel = authViewModel,
-                                onNavigateToLogin = { navController.navigate("login") }
-                            )
-                        }
-                        composable("verify_mfa") {
-                            VerifyMfaScreen(
-                                viewModel = authViewModel,
-                                onLoginSuccess = {
-                                    authViewModel.fetchProfile()
-                                    requestLocationPermissions()
-                                    navController.navigate("main") {
-                                        popUpTo("login") { inclusive = true }
+                                )
+                            }
+                            composable("signup") {
+                                SignUpScreen(
+                                    viewModel = authViewModel,
+                                    onNavigateToLogin = { navController.navigate("login") },
+                                    onNavigateToVerify = { navController.navigate("verify_account") }
+                                )
+                            }
+                            composable("verify_account") {
+                                VerifyAccountScreen(
+                                    viewModel = authViewModel,
+                                    onNavigateToLogin = { navController.navigate("login") }
+                                )
+                            }
+                            composable("verify_mfa") {
+                                VerifyMfaScreen(
+                                    viewModel = authViewModel,
+                                    onLoginSuccess = {
+                                        authViewModel.fetchProfile()
+                                        requestLocationPermissions()
+                                        sessionManager.getUserId()?.let { uid -> startChatService(uid) }
+                                        navController.navigate("main") {
+                                            popUpTo("login") { inclusive = true }
+                                        }
                                     }
-                                }
-                            )
-                        }
-                        composable("forgot_password") {
-                            ForgotPasswordScreen(
-                                viewModel = authViewModel,
-                                onNavigateToResetPassword = { navController.navigate("reset_password") }
-                            )
-                        }
-                        composable("reset_password") {
-                            ResetPasswordScreen(
-                                viewModel = authViewModel,
-                                onNavigateToLogin = { navController.navigate("login") }
-                            )
-                        }
-                        composable("main") {
-                            MainScreen(
-                                authViewModel = authViewModel,
-                                onLogout = {
-                                    authViewModel.logout()
-                                    stopLocationService()
-                                    navController.navigate("login") {
-                                        popUpTo("main") { inclusive = true }
+                                )
+                            }
+                            composable("forgot_password") {
+                                ForgotPasswordScreen(
+                                    viewModel = authViewModel,
+                                    onNavigateToResetPassword = { navController.navigate("reset_password") }
+                                )
+                            }
+                            composable("reset_password") {
+                                ResetPasswordScreen(
+                                    viewModel = authViewModel,
+                                    onNavigateToLogin = { navController.navigate("login") }
+                                )
+                            }
+                            composable("main") {
+                                MainScreen(
+                                    authViewModel = authViewModel,
+                                    onLogout = {
+                                        authViewModel.logout()
+                                        stopLocationService()
+                                        stopChatService()
+                                        navController.navigate("login") {
+                                            popUpTo("main") { inclusive = true }
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
             }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error in onCreate", e)
+            // Ideally show an error screen or toast, but for now prevent crash loop
         }
     }
 
     private fun requestLocationPermissions() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                startLocationService()
-            }
-            else -> {
-                locationPermissionRequest.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
+        try {
+            when {
+                ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.ACCESS_FINE_LOCATION
+                ) == PackageManager.PERMISSION_GRANTED -> {
+                    startLocationService()
+                }
+                else -> {
+                    locationPermissionRequest.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
                     )
-                )
+                }
             }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error requesting permissions", e)
         }
     }
 
     private fun startLocationService() {
-        Intent(this, LocationForegroundService::class.java).also { intent ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(intent)
-            } else {
-                startService(intent)
+        try {
+            Intent(this, LocationForegroundService::class.java).also { intent ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    startForegroundService(intent)
+                } else {
+                    startService(intent)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error starting location service", e)
+        }
+    }
+    
+    private fun startChatService(userId: String) {
+        try {
+            ChatConnectionService.start(this, userId)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error starting chat service", e)
         }
     }
 
     private fun stopLocationService() {
-        Intent(this, LocationForegroundService::class.java).also { intent ->
-            stopService(intent)
+        try {
+            Intent(this, LocationForegroundService::class.java).also { intent ->
+                stopService(intent)
+            }
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error stopping location service", e)
+        }
+    }
+    
+    private fun stopChatService() {
+        try {
+            ChatConnectionService.stop(this)
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Error stopping chat service", e)
         }
     }
 }

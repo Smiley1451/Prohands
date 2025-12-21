@@ -4,13 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -19,6 +15,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.anand.prohands.data.JobRequest
+import com.anand.prohands.ui.components.AppHeader
 import com.anand.prohands.ui.components.MapPickerComponent
 import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.PostJobViewModel
@@ -56,15 +53,7 @@ fun PostJobScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Create New Job", color = ProColors.OnPrimary, fontWeight = FontWeight.Bold) },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ProColors.OnPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = ProColors.Primary)
-            )
+            AppHeader(title = "Create New Job", onBackClick = { navController.popBackStack() })
         },
         containerColor = ProColors.Background
     ) { padding ->

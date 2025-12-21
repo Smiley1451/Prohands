@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
+import android.util.Log
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -19,6 +20,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.core.app.ActivityCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.anand.prohands.data.JobResponse
+import com.anand.prohands.ui.components.AppHeader
 import com.anand.prohands.ui.components.ShimmerEffect
 import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.HomeViewModel
@@ -32,16 +34,28 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun HomeScreen(
-    viewModel: HomeViewModel = viewModel(factory = HomeViewModelFactory())
+    currentUserId: String,
+    viewModel: HomeViewModel = viewModel(factory = HomeViewModelFactory()),
+    onProfileClick: () -> Unit,
+    onMessagesClick: () -> Unit,
+    onNotificationsClick: () -> Unit
 ) {
     val jobs by viewModel.jobs.collectAsState()
     val location by viewModel.location.collectAsState()
+    val currentUserProfile by viewModel.currentUserProfile.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
     val context = LocalContext.current
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    
+    // Fetch user profile on load to get the image
+    LaunchedEffect(currentUserId) {
+        if (currentUserId.isNotEmpty()) {
+            viewModel.fetchUserProfile(currentUserId)
+        }
+    }
 
     RequestLocation(context) { newLocation ->
         viewModel.setLocation(newLocation)
@@ -64,6 +78,15 @@ fun HomeScreen(
     }
     
     Scaffold(
+        topBar = {
+            AppHeader(
+                isHome = true,
+                onProfileClick = onProfileClick,
+                onMessagesClick = onMessagesClick,
+                onNotificationsClick = onNotificationsClick,
+                profileImageUrl = currentUserProfile?.profilePictureUrl
+            )
+        },
         containerColor = ProColors.Background,
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) {
@@ -195,10 +218,16 @@ fun RequestLocation(context: Context, onLocationReceived: (Location) -> Unit) {
     val fusedLocationClient = remember { LocationServices.getFusedLocationProviderClient(context) }
 
     DisposableEffect(Unit) {
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
-                location?.let { onLocationReceived(it) }
+        try {
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+                fusedLocationClient.lastLocation.addOnSuccessListener { location: Location? ->
+                    location?.let { onLocationReceived(it) }
+                }.addOnFailureListener { e ->
+                    Log.e("HomeScreen", "Error getting location", e)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("HomeScreen", "Error requesting location", e)
         }
         onDispose { }
     }

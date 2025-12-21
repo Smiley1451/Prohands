@@ -22,10 +22,15 @@ fun NavGraph(
         startDestination = BottomNavigation.Home.route
     ) {
         composable(BottomNavigation.Home.route) {
-            HomeScreen()
+            HomeScreen(
+                currentUserId = currentUserId, 
+                onProfileClick = { navController.navigate(BottomNavigation.Profile.route) },
+                onMessagesClick = { navController.navigate("messages/$currentUserId") },
+                onNotificationsClick = { /* Navigate to notifications */ }
+            )
         }
         composable(BottomNavigation.Search.route) {
-            SearchScreen()
+            SearchScreen(navController = navController)
         }
         composable(BottomNavigation.PostJob.route) {
             PostJobScreen(navController = navController, currentUserId = currentUserId)
@@ -45,11 +50,19 @@ fun NavGraph(
                 userId = currentUserId,
                 isReadOnly = false,
                 onEditProfile = { navController.navigate("edit_profile/$currentUserId") },
-                onLogout = onLogout
+                onLogout = onLogout,
+                onJobClick = { jobId -> navController.navigate("job_details/$jobId") }
             )
         }
         composable("create_job") {
             PostJobScreen(navController = navController, currentUserId = currentUserId)
+        }
+        composable(
+            "edit_job/{jobId}",
+            arguments = listOf(navArgument("jobId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
+            EditJobScreen(navController = navController, jobId = jobId)
         }
         composable(
             "edit_profile/{userId}",
@@ -84,7 +97,29 @@ fun NavGraph(
             arguments = listOf(navArgument("userId") { type = NavType.StringType })
         ) { backStackEntry ->
             val userId = backStackEntry.arguments?.getString("userId") ?: ""
-            ProfileScreen(userId = userId, isReadOnly = true)
+            ProfileScreen(
+                userId = userId, 
+                isReadOnly = true,
+                onMessageClick = { navController.navigate("messages/$userId") }
+            )
+        }
+        composable(
+            "messages/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipientId = backStackEntry.arguments?.getString("userId") ?: ""
+            MessagesScreen(
+                currentUserId = currentUserId,
+                recipientId = recipientId,
+                navController = navController
+            )
+        }
+        composable(
+            "job_details/{jobId}",
+            arguments = listOf(navArgument("jobId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val jobId = backStackEntry.arguments?.getString("jobId") ?: ""
+            JobDetailsScreen(jobId = jobId, navController = navController)
         }
     }
 }
