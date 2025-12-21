@@ -17,6 +17,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
@@ -74,7 +75,9 @@ object ChatRepository {
         // Construct WebSocket URL from Retrofit Base URL
         val httpUrl = RetrofitClient.BASE_URL
         val wsUrl = httpUrl.replace("https://", "wss://").replace("http://", "ws://")
-        val stompUrl = "${wsUrl}ws?userId=$userId"
+        
+        // Use /ws/websocket to bypass SockJS protocol and use raw WebSockets
+        val stompUrl = "${wsUrl}ws/websocket?userId=$userId"
         
         Log.d("ChatRepository", "Attempting to connect to: $stompUrl")
         
@@ -93,7 +96,18 @@ object ChatRepository {
                     LifecycleEvent.Type.OPENED -> {
                         Log.d("ChatRepository", "Stomp connection opened")
                         _connectionStatus.tryEmit(true)
-                        subscribeToTopics()
+                        
+                        // Wait for STOMP handshake (CONNECT/CONNECTED) to complete.
+                        // We use a delay because this library's OPENED event signals the TCP/WebSocket open,
+                        // but not necessarily the STOMP CONNECTED frame.
+                        repositoryScope.launch {
+                            delay(500) 
+                            if (stompClient?.isConnected == true) {
+                                subscribeToTopics()
+                            } else {
+                                Log.w("ChatRepository", "Skipping subscription: Not connected after delay")
+                            }
+                        }
                     }
                     LifecycleEvent.Type.ERROR -> {
                         Log.e("ChatRepository", "Stomp connection error", lifecycleEvent.exception)
@@ -114,6 +128,11 @@ object ChatRepository {
     private fun subscribeToTopics() {
         stompClient?.let { client ->
             try {
+                if (!client.isConnected) {
+                    Log.w("ChatRepository", "Cannot subscribe: Client not connected")
+                    return
+                }
+
                 // Messages
                 val messagesDisp = client.topic("/user/queue/messages")
                     .subscribeOn(Schedulers.io())
@@ -153,6 +172,8 @@ object ChatRepository {
                 compositeDisposable.add(readDisp)
             } catch (e: IllegalStateException) {
                  Log.e("ChatRepository", "Failed to subscribe to topics, connection likely closed", e)
+            } catch (e: Exception) {
+                 Log.e("ChatRepository", "Error in subscribeToTopics", e)
             }
         }
     }
