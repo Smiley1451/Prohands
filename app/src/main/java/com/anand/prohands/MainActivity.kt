@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -53,12 +54,10 @@ class MainActivity : ComponentActivity() {
             val sessionManager = (application as ProHandsApplication).sessionManager
             val viewModelFactory = AuthViewModelFactory(sessionManager)
 
-            val userId = sessionManager.getUserId()
+            // Only request location permissions here if logged in. 
+            // We defer startChatService until the profile is fully loaded.
             if (sessionManager.getAuthToken() != null) {
                 requestLocationPermissions()
-                if (userId != null) {
-                    startChatService(userId)
-                }
             }
 
             setContent {
@@ -69,8 +68,21 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val navController = rememberNavController()
                         val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
+                        val authState by authViewModel.state.collectAsState()
 
-                        val startDestination = if (sessionManager.getAuthToken() != null) "main" else "login"
+                        // Monitor profile state to initialize chat service at the correct time
+                        LaunchedEffect(authState.profile) {
+                            if (authState.profile != null) {
+                                val uid = authState.userId ?: sessionManager.getUserId()
+                                if (!uid.isNullOrEmpty()) {
+                                    startChatService(uid)
+                                }
+                            }
+                        }
+
+                        // Check session again inside composition to decide start destination safely
+                        val isLoggedIn = sessionManager.getAuthToken() != null
+                        val startDestination = if (isLoggedIn) "main" else "login"
 
                         NavHost(navController = navController, startDestination = startDestination) {
                             composable("login") {
@@ -82,7 +94,7 @@ class MainActivity : ComponentActivity() {
                                     onLoginSuccess = {
                                         authViewModel.fetchProfile()
                                         requestLocationPermissions()
-                                        sessionManager.getUserId()?.let { uid -> startChatService(uid) }
+                                        // Chat service will be started by the LaunchedEffect above once profile is loaded
                                         navController.navigate("main") {
                                             popUpTo("login") { inclusive = true }
                                         }
@@ -108,7 +120,7 @@ class MainActivity : ComponentActivity() {
                                     onLoginSuccess = {
                                         authViewModel.fetchProfile()
                                         requestLocationPermissions()
-                                        sessionManager.getUserId()?.let { uid -> startChatService(uid) }
+                                        // Chat service will be started by the LaunchedEffect above once profile is loaded
                                         navController.navigate("main") {
                                             popUpTo("login") { inclusive = true }
                                         }
@@ -189,7 +201,12 @@ class MainActivity : ComponentActivity() {
     
     private fun startChatService(userId: String) {
         try {
-            ChatConnectionService.start(this, userId)
+            // Verify userId is not empty or null before starting service
+            if (userId.isNotBlank()) {
+                ChatConnectionService.start(this, userId)
+            } else {
+                Log.e("MainActivity", "Cannot start ChatConnectionService: userId is blank")
+            }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error starting chat service", e)
         }

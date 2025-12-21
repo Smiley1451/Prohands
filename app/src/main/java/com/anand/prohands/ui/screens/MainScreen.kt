@@ -17,10 +17,10 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.anand.prohands.ProHandsApplication
 import com.anand.prohands.navigation.BottomNavigation
 import com.anand.prohands.navigation.NavGraph
 import com.anand.prohands.ui.theme.ProColors
-import com.anand.prohands.utils.SessionManager
 import com.anand.prohands.viewmodel.AuthViewModel
 
 @Composable
@@ -30,7 +30,8 @@ fun MainScreen(
 ) {
     val navController = rememberNavController()
     val context = LocalContext.current
-    val sessionManager = SessionManager(context)
+    // Use the singleton instance from Application to avoid multiple EncryptedSharedPreferences instances
+    val sessionManager = (context.applicationContext as ProHandsApplication).sessionManager
     val currentUserId = sessionManager.getUserId() ?: ""
 
     Scaffold(

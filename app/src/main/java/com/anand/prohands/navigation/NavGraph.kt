@@ -25,7 +25,9 @@ fun NavGraph(
             HomeScreen(
                 currentUserId = currentUserId, 
                 onProfileClick = { navController.navigate(BottomNavigation.Profile.route) },
-                onMessagesClick = { navController.navigate("messages/$currentUserId") },
+                onMessagesClick = { 
+                    navController.navigate("chat_list")
+                },
                 onNotificationsClick = { /* Navigate to notifications */ }
             )
         }
@@ -102,6 +104,9 @@ fun NavGraph(
                 isReadOnly = true,
                 onMessageClick = { navController.navigate("messages/$userId") }
             )
+        }
+        composable("chat_list") {
+            ChatListScreen(navController = navController, currentUserId = currentUserId)
         }
         composable(
             "messages/{userId}",

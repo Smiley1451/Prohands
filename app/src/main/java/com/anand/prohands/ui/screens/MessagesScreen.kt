@@ -44,6 +44,14 @@ fun MessagesScreen(
     recipientId: String,
     navController: NavController
 ) {
+    // Only instantiate ViewModel if we have valid IDs
+    if (currentUserId.isEmpty() || recipientId.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Invalid user information", color = ProColors.Error)
+        }
+        return
+    }
+
     val viewModel: ChatViewModel = viewModel(
         factory = ChatViewModelFactory(currentUserId, recipientId)
     )

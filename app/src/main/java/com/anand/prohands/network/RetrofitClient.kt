@@ -13,7 +13,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "https://unsufferably-heimish-tashina.ngrok-free.dev/"
+    const val BASE_URL = "https://unsufferably-heimish-tashina.ngrok-free.dev/"
     
     private const val CERT_HOST = "unsufferably-heimish-tashina.ngrok-free.dev"
     private const val CERT_PIN_PLACEHOLDER = "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
