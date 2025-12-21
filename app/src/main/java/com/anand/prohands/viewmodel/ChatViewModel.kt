@@ -1,204 +1,160 @@
 package com.anand.prohands.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.anand.prohands.data.chat.ChatItem
-import com.anand.prohands.data.chat.ChatMessage
-import com.anand.prohands.data.chat.ChatMessageDto
-import com.anand.prohands.data.chat.UserPresence
-import com.anand.prohands.repository.ChatRepository
+import com.anand.prohands.data.chat.*
+import com.anand.prohands.network.WebSocketClient
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-import java.util.TimeZone
+import java.util.*
 
 class ChatViewModel(
+    private val repository: ChatRepository,
     private val currentUserId: String,
-    private val recipientId: String
+    private val recipientId: String,
+    private val chatId: String
 ) : ViewModel() {
 
-    private val _messages = MutableStateFlow<List<ChatMessage>>(emptyList())
-    
-    // Transform messages to ChatItems with Date Separators
-    val chatItems: StateFlow<List<ChatItem>> = _messages
-        .map { messages ->
-            val items = mutableListOf<ChatItem>()
-            var lastDate = ""
+    // Raw messages from DB
+    private val _messagesFlow = repository.getMessagesForChat(chatId)
+
+    // UI State: Messages grouped by date with separators
+    val uiState: StateFlow<ChatUiState> = _messagesFlow.map { messages ->
+        val grouped = mutableListOf<ChatItem>()
+        var lastDate = ""
+        
+        val dateFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+        val displayFormat = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
+
+        messages.forEach { message ->
+            val date = Date(message.timestamp)
+            val dateStr = dateFormat.format(date)
             
-            val sortedMessages = messages.sortedBy { it.timestamp }
-            
-            val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-            val displayFormat = SimpleDateFormat("MMMM dd, yyyy", Locale.getDefault())
-            
-            sortedMessages.forEach { message ->
-                val dateStr = try {
-                     if (message.timestamp.length >= 10) message.timestamp.substring(0, 10) else ""
-                } catch (e: Exception) { "" }
-                
-                if (dateStr.isNotEmpty() && dateStr != lastDate) {
-                    val displayDate = try {
-                        val date = dateFormat.parse(dateStr)
-                        if (isToday(date)) "Today" 
-                        else if (isYesterday(date)) "Yesterday"
-                        else displayFormat.format(date!!)
-                    } catch (e: Exception) { dateStr }
-                    
-                    items.add(ChatItem.DateSeparator(displayDate))
-                    lastDate = dateStr
+            if (dateStr != lastDate) {
+                val displayDate = when {
+                    isToday(date) -> "Today"
+                    isYesterday(date) -> "Yesterday"
+                    else -> displayFormat.format(date)
                 }
-                items.add(ChatItem.Message(message))
+                grouped.add(ChatItem.DateSeparator(displayDate))
+                lastDate = dateStr
             }
-            items.toList()
+            grouped.add(ChatItem.Message(message))
         }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        ChatUiState(items = grouped)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), ChatUiState())
 
-    private val _typing = MutableStateFlow(false)
-    val typing: StateFlow<Boolean> = _typing.asStateFlow()
+    private val _recipientPresence = MutableStateFlow<PresenceDto?>(null)
+    val recipientPresence: StateFlow<PresenceDto?> = _recipientPresence.asStateFlow()
 
-    private val _isConnected = MutableStateFlow(false)
-    val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
-
-    private val _recipientPresence = MutableStateFlow<UserPresence?>(null)
-    val recipientPresence: StateFlow<UserPresence?> = _recipientPresence.asStateFlow()
+    private val _isTyping = MutableStateFlow(false)
+    val isTyping: StateFlow<Boolean> = _isTyping.asStateFlow()
+    
+    // For voice recording UI state
+    private val _isRecording = MutableStateFlow(false)
+    val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
     private var typingJob: Job? = null
 
     init {
-        ChatRepository.initialize(currentUserId)
-        
-        loadHistory()
-        observeIncomingMessages()
+        repository.currentUserId = currentUserId
         observeTyping()
-        observeConnection()
-        fetchRecipientPresence()
-    }
-
-    private fun isToday(date: Date?): Boolean {
-        if (date == null) return false
-        val today = Date()
-        val fmt = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-        return fmt.format(date) == fmt.format(today)
-    }
-    
-    private fun isYesterday(date: Date?): Boolean {
-        if (date == null) return false
-        val today = Date()
-        val cal = java.util.Calendar.getInstance()
-        cal.time = today
-        cal.add(java.util.Calendar.DAY_OF_YEAR, -1)
-        val yesterday = cal.time
-        val fmt = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
-        return fmt.format(date) == fmt.format(yesterday)
-    }
-
-    private fun observeConnection() {
+        observePresence()
+        
         viewModelScope.launch {
-            ChatRepository.connectionStatus.collectLatest { connected ->
-                _isConnected.value = connected
-            }
-        }
-    }
-
-    private fun loadHistory() {
-        viewModelScope.launch {
-            val chatId = getChatId(currentUserId, recipientId)
-            val result = ChatRepository.getChatHistory(chatId)
-            result.onSuccess { history ->
-                _messages.value = history
-            }
-        }
-    }
-
-    private fun observeIncomingMessages() {
-        viewModelScope.launch {
-            ChatRepository.incomingMessages.collect { message ->
-                if (message.chatId == getChatId(currentUserId, recipientId)) {
-                    _messages.value = _messages.value + message
-                    if (message.senderId == recipientId) {
-                        ChatRepository.sendReadReceipt(message.messageId)
-                    }
-                }
-            }
+            repository.markMessagesAsRead(chatId, currentUserId)
         }
     }
 
     private fun observeTyping() {
         viewModelScope.launch {
-            ChatRepository.typingStatus.collect { senderId ->
-                if (senderId == recipientId) {
-                    _typing.value = true
-                    typingJob?.cancel()
-                    typingJob = launch {
-                        delay(3000)
-                        _typing.value = false
+            WebSocketClient.events.collect { event ->
+                if (event is TypingStatusDto && event.chatId == chatId && event.userId == recipientId) {
+                    _isTyping.value = event.isTyping
+                    if (event.isTyping) {
+                         typingJob?.cancel()
+                         typingJob = launch {
+                             delay(3000)
+                             _isTyping.value = false
+                         }
                     }
                 }
             }
         }
     }
 
-    fun sendMessage(content: String, type: String = "TEXT") {
-        val messageDto = ChatMessageDto(
-            recipientId = recipientId,
-            type = type,
-            content = content
-        )
-        ChatRepository.sendMessage(messageDto)
-        
-        val now = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US).apply {
-            timeZone = TimeZone.getTimeZone("UTC")
-        }.format(Date())
-
-        val optimisticMessage = ChatMessage(
-            messageId = System.currentTimeMillis().toString(),
-            chatId = getChatId(currentUserId, recipientId),
-            senderId = currentUserId,
-            recipientId = recipientId,
-            type = type,
-            content = content,
-            status = "SENT",
-            timestamp = now
-        )
-         _messages.value = _messages.value + optimisticMessage
-    }
-
-    fun sendTyping() {
-        ChatRepository.sendTyping(recipientId)
-    }
-    
-    private fun fetchRecipientPresence() {
+    private fun observePresence() {
         viewModelScope.launch {
-            val result = ChatRepository.getUserPresence(recipientId)
-            result.onSuccess { presence ->
-                _recipientPresence.value = presence
+            WebSocketClient.events.collect { event ->
+                 if (event is PresenceDto && event.userId == recipientId) {
+                     _recipientPresence.value = event
+                 }
             }
         }
     }
+
+    fun sendMessage(content: String, type: MessageType = MessageType.TEXT) {
+        viewModelScope.launch {
+            repository.sendMessage(chatId, content, currentUserId, recipientId)
+        }
+    }
     
-    private fun getChatId(user1: String, user2: String): String {
-        return if (user1 < user2) "${user1}_${user2}" else "${user2}_${user1}"
+    fun sendMediaMessage(uri: Uri, type: MessageType) {
+        // In a real app, you would upload the file to Cloudinary here using 
+        // repository.signMedia() and then send the returned URL.
+        // For this demo, we'll just send the URI string.
+        sendMessage(uri.toString(), type)
+    }
+
+    fun onUserTyping() {
+        viewModelScope.launch {
+             WebSocketClient.sendTypingStatus(TypingStatusDto(chatId, currentUserId, recipientId, true))
+        }
+    }
+    
+    fun setRecordingState(isRecording: Boolean) {
+        _isRecording.value = isRecording
+    }
+
+    private fun isToday(date: Date): Boolean {
+        val today = Calendar.getInstance()
+        val d = Calendar.getInstance().apply { time = date }
+        return today.get(Calendar.YEAR) == d.get(Calendar.YEAR) &&
+                today.get(Calendar.DAY_OF_YEAR) == d.get(Calendar.DAY_OF_YEAR)
+    }
+
+    private fun isYesterday(date: Date): Boolean {
+        val yesterday = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -1) }
+        val d = Calendar.getInstance().apply { time = date }
+        return yesterday.get(Calendar.YEAR) == d.get(Calendar.YEAR) &&
+                yesterday.get(Calendar.DAY_OF_YEAR) == d.get(Calendar.DAY_OF_YEAR)
     }
 }
 
+data class ChatUiState(
+    val items: List<ChatItem> = emptyList()
+)
+
+sealed class ChatItem {
+    data class Message(val message: MessageEntity) : ChatItem()
+    data class DateSeparator(val date: String) : ChatItem()
+}
+
 class ChatViewModelFactory(
+    private val repository: ChatRepository,
     private val currentUserId: String,
-    private val recipientId: String
+    private val recipientId: String,
+    private val chatId: String
 ) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ChatViewModel(currentUserId, recipientId) as T
+            return ChatViewModel(repository, currentUserId, recipientId, chatId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

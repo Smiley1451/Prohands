@@ -9,5 +9,6 @@ data class MediaSignature(
     val signature: String,
     val timestamp: Long,
     val apiKey: String,
-    val cloudName: String
+    val cloudName: String,
+    val folder: String? = null
 )

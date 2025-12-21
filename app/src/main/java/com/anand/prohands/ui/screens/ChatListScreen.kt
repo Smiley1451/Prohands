@@ -7,9 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.AddComment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,118 +20,67 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import coil.compose.rememberAsyncImagePainter
-import com.anand.prohands.data.SearchResultDto
-import com.anand.prohands.data.local.RecentChatEntity
+import com.anand.prohands.data.chat.ConversationWithParticipants
 import com.anand.prohands.ui.components.AppHeader
 import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.ChatListViewModel
-import com.anand.prohands.viewmodel.ChatListViewModelFactory
-import com.anand.prohands.viewmodel.SearchViewModel
-import com.anand.prohands.viewmodel.SearchViewModelFactory
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 @Composable
 fun ChatListScreen(
     navController: NavController,
     currentUserId: String,
-    chatListViewModel: ChatListViewModel = viewModel(factory = ChatListViewModelFactory()),
-    searchViewModel: SearchViewModel = viewModel(factory = SearchViewModelFactory())
+    viewModel: ChatListViewModel
 ) {
-    val recentChats by chatListViewModel.recentChats.collectAsState()
-    
-    val searchQuery by searchViewModel.searchQuery.collectAsState()
-    val searchResults by searchViewModel.searchResults.collectAsState()
-    val isSearching by searchViewModel.isLoading.collectAsState()
+    val conversations by viewModel.conversations.collectAsState()
 
     Scaffold(
-        topBar = {
+        topBar = { 
             AppHeader(
-                title = "Chats",
-                onBackClick = { navController.popBackStack() }
+                title = "ProHands Chat"
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { navController.navigate("search") }, // Assuming search screen is for finding users
+                containerColor = ProColors.Primary,
+                contentColor = Color.White
+            ) {
+                Icon(Icons.Default.AddComment, contentDescription = "New Chat")
+            }
         },
         containerColor = ProColors.Background
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
-        ) {
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchViewModel.onSearchQueryChanged(it) },
-                label = { Text("Search users...", color = ProColors.TextSecondary) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = ProColors.Primary) },
+        if (conversations.isEmpty()) {
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = ProColors.Primary,
-                    unfocusedBorderColor = ProColors.TextSecondary,
-                    cursorColor = ProColors.Primary
-                ),
-                singleLine = true
-            )
-
-            if (searchQuery.isNotEmpty()) {
-                // Show Search Results
-                if (isSearching) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = ProColors.Primary)
-                    }
-                } else if (searchResults.isEmpty()) {
-                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("No users found.", color = ProColors.TextSecondary)
-                    }
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(searchResults) { result ->
-                            SearchResultItem(
-                                searchResult = result, 
-                                onClick = {
-                                    result.profile.userId?.let { userId ->
-                                        // Navigate to messages
-                                        navController.navigate("messages/$userId")
-                                    }
-                                }
-                            )
+                    .padding(padding)
+                    .fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "No conversations yet.\nStart a new chat!",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = ProColors.TextSecondary,
+                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .padding(padding)
+                    .fillMaxSize()
+            ) {
+                items(conversations) { conversation ->
+                    val otherParticipant = conversation.participants.find { it.userId != currentUserId }
+                    if (otherParticipant != null) {
+                        ConversationItem(conversation = conversation, otherParticipant = otherParticipant, currentUserId = currentUserId) {
+                            navController.navigate("chat/${otherParticipant.userId}")
                         }
-                    }
-                }
-            } else {
-                // Show Recent Chats
-                if (recentChats.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text("No recent chats.", color = ProColors.TextSecondary)
-                    }
-                } else {
-                    LazyColumn(
-                        contentPadding = PaddingValues(16.dp),
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        items(recentChats) { chat ->
-                            RecentChatItem(
-                                chat = chat,
-                                onClick = {
-                                    navController.navigate("messages/${chat.recipientId}")
-                                }
-                            )
-                            HorizontalDivider(color = ProColors.Surface, thickness = 1.dp)
-                        }
+                        Divider(color = Color.LightGray.copy(alpha = 0.2f), thickness = 0.5.dp, modifier = Modifier.padding(start = 80.dp))
                     }
                 }
             }
@@ -141,33 +89,50 @@ fun ChatListScreen(
 }
 
 @Composable
-fun RecentChatItem(
-    chat: RecentChatEntity,
+fun ConversationItem(
+    conversation: ConversationWithParticipants,
+    otherParticipant: com.anand.prohands.data.chat.ParticipantEntity,
+    currentUserId: String,
     onClick: () -> Unit
 ) {
+    val unreadCount = conversation.conversation.unreadCounts[currentUserId] ?: 0
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Profile Picture
-        val painter = if (!chat.profilePictureUrl.isNullOrEmpty()) {
-            rememberAsyncImagePainter(chat.profilePictureUrl)
-        } else {
-            rememberAsyncImagePainter("https://ui-avatars.com/api/?name=${chat.recipientName ?: "User"}&background=random")
+        // Profile Picture with Online Status
+        Box {
+            val painter = if (!otherParticipant.profilePictureUrl.isNullOrEmpty()) {
+                rememberAsyncImagePainter(otherParticipant.profilePictureUrl)
+            } else {
+                rememberAsyncImagePainter("https://ui-avatars.com/api/?name=${otherParticipant.name}&background=random")
+            }
+            
+            Image(
+                painter = painter,
+                contentDescription = "Profile Picture",
+                modifier = Modifier
+                    .size(56.dp)
+                    .clip(CircleShape)
+                    .background(Color.LightGray),
+                contentScale = ContentScale.Crop
+            )
+            
+            if (otherParticipant.isOnline) {
+                Box(
+                    modifier = Modifier
+                        .size(14.dp)
+                        .clip(CircleShape)
+                        .background(Color.Green)
+                        .align(Alignment.BottomEnd)
+                        .padding(2.dp)
+                        .background(ProColors.Background, CircleShape) // Border effect
+                )
+            }
         }
-
-        Image(
-            painter = painter,
-            contentDescription = "Profile Picture",
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(Color.Gray),
-            contentScale = ContentScale.Crop
-        )
 
         Spacer(modifier = Modifier.width(16.dp))
 
@@ -178,7 +143,7 @@ fun RecentChatItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = chat.recipientName ?: "Unknown User",
+                    text = otherParticipant.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = ProColors.TextPrimary,
@@ -186,11 +151,14 @@ fun RecentChatItem(
                     overflow = TextOverflow.Ellipsis
                 )
                 
-                Text(
-                    text = formatTime(chat.timestamp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (chat.unreadCount > 0) ProColors.Primary else ProColors.TextSecondary
-                )
+                conversation.conversation.lastMessageTimestamp?.let {
+                    Text(
+                        text = formatTime(it),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = if (unreadCount > 0) ProColors.Primary else ProColors.TextSecondary,
+                        fontWeight = if (unreadCount > 0) FontWeight.Bold else FontWeight.Normal
+                    )
+                }
             }
             
             Spacer(modifier = Modifier.height(4.dp))
@@ -201,27 +169,29 @@ fun RecentChatItem(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = chat.lastMessage,
+                    text = conversation.conversation.lastMessage ?: "",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = ProColors.TextSecondary,
+                    color = if (unreadCount > 0) ProColors.TextPrimary else ProColors.TextSecondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (unreadCount > 0) FontWeight.SemiBold else FontWeight.Normal,
                     modifier = Modifier.weight(1f)
                 )
                 
-                if (chat.unreadCount > 0) {
+                if (unreadCount > 0) {
+                    Spacer(modifier = Modifier.width(8.dp))
                     Box(
                         modifier = Modifier
-                            .size(24.dp)
+                            .size(22.dp)
                             .clip(CircleShape)
                             .background(ProColors.Primary),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (chat.unreadCount > 99) "99+" else chat.unreadCount.toString(),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = ProColors.OnPrimary,
-                            fontSize = 10.sp
+                            text = if (unreadCount > 99) "99+" else unreadCount.toString(),
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
                         )
                     }
                 }
@@ -232,16 +202,21 @@ fun RecentChatItem(
 
 private fun formatTime(timestamp: Long): String {
     val date = Date(timestamp)
-    val now = Date()
-    val diff = now.time - timestamp
-    
-    val oneDay = 24 * 60 * 60 * 1000
-    
-    return if (diff < oneDay && date.date == now.date) {
-        SimpleDateFormat("hh:mm a", Locale.getDefault()).format(date)
-    } else if (diff < 2 * oneDay) {
-        "Yesterday"
-    } else {
-        SimpleDateFormat("MM/dd/yy", Locale.getDefault()).format(date)
+    val now = Calendar.getInstance()
+    val messageDate = Calendar.getInstance().apply { time = date }
+
+    return when {
+        now.get(Calendar.YEAR) != messageDate.get(Calendar.YEAR) -> {
+            SimpleDateFormat("dd/MM/yy", Locale.getDefault()).format(date)
+        }
+        now.get(Calendar.DAY_OF_YEAR) == messageDate.get(Calendar.DAY_OF_YEAR) -> {
+            SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
+        }
+        now.get(Calendar.DAY_OF_YEAR) - messageDate.get(Calendar.DAY_OF_YEAR) == 1 -> {
+            "Yesterday"
+        }
+        else -> {
+            SimpleDateFormat("E, dd MMM", Locale.getDefault()).format(date)
+        }
     }
 }

@@ -2,13 +2,20 @@ package com.anand.prohands.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.anand.prohands.data.chat.ChatDatabase
+import com.anand.prohands.data.chat.ChatRepository
+import com.anand.prohands.network.ChatService
+import com.anand.prohands.network.RetrofitClient
 import com.anand.prohands.ui.screens.*
-import com.anand.prohands.viewmodel.AuthViewModel
+import com.anand.prohands.viewmodel.*
 
 @Composable
 fun NavGraph(
@@ -17,6 +24,15 @@ fun NavGraph(
     authViewModel: AuthViewModel,
     onLogout: () -> Unit,
 ) {
+    // --- Dependency Setup for Chat --- //
+    val context = LocalContext.current
+    val chatDb = remember { ChatDatabase.getDatabase(context) }
+    val chatService = remember { RetrofitClient.instance.create(ChatService::class.java) }
+    val chatRepository = remember { ChatRepository(chatDb.chatDao(), chatService) }
+    LaunchedEffect(currentUserId) {
+        chatRepository.currentUserId = currentUserId
+    }
+
     NavHost(
         navController = navController,
         startDestination = BottomNavigation.Home.route
@@ -25,16 +41,46 @@ fun NavGraph(
             HomeScreen(
                 currentUserId = currentUserId, 
                 onProfileClick = { navController.navigate(BottomNavigation.Profile.route) },
-                onMessagesClick = { 
-                    navController.navigate("chat_list")
-                },
+                onMessagesClick = { navController.navigate("chat_list") },
                 onNotificationsClick = { /* Navigate to notifications */ }
             )
         }
         composable(BottomNavigation.Search.route) {
             SearchScreen(navController = navController)
         }
-        composable(BottomNavigation.PostJob.route) {
+        // ... other composables ...
+
+        composable("chat_list") {
+            val chatListViewModel: ChatListViewModel = viewModel(
+                factory = ChatListViewModelFactory(chatRepository, currentUserId)
+            )
+            ChatListScreen(
+                navController = navController, 
+                currentUserId = currentUserId,
+                viewModel = chatListViewModel
+            )
+        }
+
+        composable(
+            "chat/{userId}",
+            arguments = listOf(navArgument("userId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val recipientId = backStackEntry.arguments?.getString("userId") ?: ""
+            val chatId = if (currentUserId < recipientId) "${currentUserId}_${recipientId}" else "${recipientId}_${currentUserId}"
+
+            val chatViewModel: ChatViewModel = viewModel(
+                factory = ChatViewModelFactory(chatRepository, currentUserId, recipientId, chatId)
+            )
+            MessagesScreen(
+                navController = navController,
+                chatViewModel = chatViewModel,
+                // Passing these as arguments for the top bar
+                recipientName = "", // You would fetch the user's name from a repository here
+                recipientAvatar = "" // And the avatar URL
+            )
+        }
+         // ... other composables ...
+         composable(BottomNavigation.PostJob.route) {
             PostJobScreen(navController = navController, currentUserId = currentUserId)
         }
         composable(BottomNavigation.Jobs.route) {
@@ -102,21 +148,7 @@ fun NavGraph(
             ProfileScreen(
                 userId = userId, 
                 isReadOnly = true,
-                onMessageClick = { navController.navigate("messages/$userId") }
-            )
-        }
-        composable("chat_list") {
-            ChatListScreen(navController = navController, currentUserId = currentUserId)
-        }
-        composable(
-            "messages/{userId}",
-            arguments = listOf(navArgument("userId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val recipientId = backStackEntry.arguments?.getString("userId") ?: ""
-            MessagesScreen(
-                currentUserId = currentUserId,
-                recipientId = recipientId,
-                navController = navController
+                onMessageClick = { navController.navigate("chat/$userId") }
             )
         }
         composable(

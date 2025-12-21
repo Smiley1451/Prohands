@@ -13,6 +13,11 @@ class AuthInterceptor(private val sessionManager: SessionManager) : Interceptor 
             requestBuilder.addHeader("Authorization", "Bearer $token")
         }
 
+        // Add the user ID to a custom header for backend services that need it
+        sessionManager.getUserId()?.let { userId ->
+            requestBuilder.addHeader("X-User-Id", userId)
+        }
+
         return chain.proceed(requestBuilder.build())
     }
 }

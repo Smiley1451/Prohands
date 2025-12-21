@@ -9,7 +9,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,7 +21,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -29,27 +34,42 @@ import com.anand.prohands.ui.components.AppHeader
 import com.anand.prohands.ui.theme.ProColors
 import com.anand.prohands.viewmodel.SearchViewModel
 import com.anand.prohands.viewmodel.SearchViewModelFactory
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun SearchScreen(
     navController: NavController,
     viewModel: SearchViewModel = viewModel(factory = SearchViewModelFactory())
 ) {
-    val searchQuery by viewModel.searchQuery.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val error by viewModel.error.collectAsState()
+    
+    // This local state is used to debounce the user's input.
+    // The UI updates instantly, but the search API call is delayed.
+    var searchQuery by remember { mutableStateOf("") }
 
     val listState = rememberLazyListState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
+    val coroutineScope = rememberCoroutineScope()
+
+    // --- Side Effects ---
+
+    // Debounce search input
+    LaunchedEffect(searchQuery) {
+        delay(350L)
+        viewModel.onSearchQueryChanged(searchQuery)
+    }
 
     // Infinite scroll detection
-    val buffer = 2
     val isScrollToEnd by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
             val lastVisibleItemIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            totalItems > 0 && lastVisibleItemIndex >= (totalItems - buffer)
+            totalItems > 0 && lastVisibleItemIndex >= (totalItems - 2) // buffer
         }
     }
 
@@ -58,9 +78,24 @@ fun SearchScreen(
             viewModel.loadNextPage()
         }
     }
+    
+    // Snackbar for errors
+    LaunchedEffect(error) {
+        if (error != null && searchResults.isNotEmpty()) {
+            coroutineScope.launch {
+                 snackbarHostState.showSnackbar(
+                    message = error ?: "An unknown error occurred",
+                    duration = SnackbarDuration.Long
+                )
+            }
+        }
+    }
+
+    // --- UI ---
 
     Scaffold(
         topBar = { AppHeader(title = "Search Workers") },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         containerColor = ProColors.Background
     ) { padding ->
         Column(
@@ -68,10 +103,9 @@ fun SearchScreen(
                 .padding(padding)
                 .fillMaxSize()
         ) {
-            // Search Bar
             OutlinedTextField(
                 value = searchQuery,
-                onValueChange = { viewModel.onSearchQueryChanged(it) },
+                onValueChange = { searchQuery = it },
                 label = { Text("Search by name, skills...", color = ProColors.TextSecondary) },
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search", tint = ProColors.Primary) },
                 modifier = Modifier
@@ -83,23 +117,40 @@ fun SearchScreen(
                     unfocusedBorderColor = ProColors.TextSecondary,
                     cursorColor = ProColors.Primary
                 ),
-                singleLine = true
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
             )
 
-            // Results List
             Box(modifier = Modifier.fillMaxSize()) {
-                if (searchResults.isEmpty() && !isLoading && searchQuery.length >= 2) {
+                // Initial loading state
+                if (isLoading && searchResults.isEmpty()) {
+                    CircularProgressIndicator(
+                        color = ProColors.Primary,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                // Initial error state
+                } else if (error != null && searchResults.isEmpty()) {
+                    Text(
+                        text = error!!,
+                        color = ProColors.Error,
+                        modifier = Modifier.align(Alignment.Center).padding(16.dp)
+                    )
+                // Empty state after a search has been performed
+                } else if (!isLoading && searchResults.isEmpty() && searchQuery.length >= 2) {
                     Text(
                         text = "No results found.",
                         color = ProColors.TextSecondary,
                         modifier = Modifier.align(Alignment.Center)
                     )
+                // Prompt to start searching
                 } else if (searchQuery.length < 2) {
-                    Text(
+                     Text(
                         text = "Type at least 2 characters to search",
                         color = ProColors.TextSecondary,
                         modifier = Modifier.align(Alignment.Center)
                     )
+                // Results list
                 } else {
                     LazyColumn(
                         state = listState,
@@ -108,12 +159,23 @@ fun SearchScreen(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(searchResults) { result ->
-                            SearchResultItem(searchResult = result, onClick = {
-                                val userId = result.profile.userId
-                                navController.navigate("worker_profile/$userId")
-                            })
+                            SearchResultItem(
+                                searchResult = result, 
+                                onClick = {
+                                    focusManager.clearFocus()
+                                    val userId = result.profile.userId
+                                    navController.navigate("worker_profile/$userId")
+                                },
+                                onMessageClick = {
+                                    focusManager.clearFocus()
+                                    val userId = result.profile.userId
+                                    // Navigate to the chat screen with the selected user
+                                    navController.navigate("chat/$userId")
+                                }
+                            )
                         }
                         
+                        // Pagination loading indicator
                         if (isLoading && searchResults.isNotEmpty()) {
                             item {
                                 Box(
@@ -126,23 +188,6 @@ fun SearchScreen(
                         }
                     }
                 }
-
-                if (isLoading && searchResults.isEmpty()) {
-                    CircularProgressIndicator(
-                        color = ProColors.Primary,
-                        modifier = Modifier.align(Alignment.Center)
-                    )
-                }
-                
-                error?.let {
-                   if (searchResults.isEmpty()) {
-                       Text(
-                           text = it,
-                           color = ProColors.Error,
-                           modifier = Modifier.align(Alignment.Center).padding(16.dp)
-                       )
-                   }
-                }
             }
         }
     }
@@ -151,7 +196,8 @@ fun SearchScreen(
 @Composable
 fun SearchResultItem(
     searchResult: SearchResultDto,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onMessageClick: () -> Unit
 ) {
     val profile = searchResult.profile
     
@@ -169,7 +215,6 @@ fun SearchResultItem(
                 .fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Profile Picture
             val painter = if (!profile.profilePictureUrl.isNullOrEmpty()) {
                 rememberAsyncImagePainter(profile.profilePictureUrl)
             } else {
@@ -196,7 +241,6 @@ fun SearchResultItem(
                     color = ProColors.TextPrimary
                 )
                 
-                // User ID
                 Text(
                     text = "@${profile.userId}",
                     style = MaterialTheme.typography.labelSmall,
@@ -225,15 +269,29 @@ fun SearchResultItem(
                 }
             }
             
-            // Note: distance is not in SearchResultDto/ClientProfileDto in the updated schema.
-            // Using score instead if relevant or omitted. 
-            // The prompt says "score: Double" is in SearchResultDto.
-            Column(horizontalAlignment = Alignment.End) {
+            // Actions Column
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.Center
+            ) {
                 Text(
-                     text = "Match: ${(searchResult.score * 100).toInt()}%", // Example usage of score
+                     text = "Match: ${(searchResult.score * 100).toInt()}%",
                      style = MaterialTheme.typography.labelMedium,
                      color = ProColors.TextSecondary
                 )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                IconButton(
+                    onClick = onMessageClick,
+                    modifier = Modifier.background(ProColors.Primary.copy(alpha = 0.1f), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Message,
+                        contentDescription = "Message",
+                        tint = ProColors.Primary
+                    )
+                }
             }
         }
     }

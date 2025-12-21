@@ -13,7 +13,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -22,12 +21,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.anand.prohands.network.RetrofitClient
 import com.anand.prohands.services.ChatConnectionService
 import com.anand.prohands.services.LocationForegroundService
 import com.anand.prohands.ui.screens.*
 import com.anand.prohands.ui.theme.ProHandsTheme
-import com.anand.prohands.utils.SessionManager
 import com.anand.prohands.viewmodel.AuthViewModel
 import com.anand.prohands.viewmodel.AuthViewModelFactory
 
@@ -50,14 +47,15 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         try {
-            // Get singleton SessionManager
             val sessionManager = (application as ProHandsApplication).sessionManager
             val viewModelFactory = AuthViewModelFactory(sessionManager)
 
-            // Only request location permissions here if logged in. 
-            // We defer startChatService until the profile is fully loaded.
-            if (sessionManager.getAuthToken() != null) {
-                requestLocationPermissions()
+            // If user is already logged in, start services immediately
+            sessionManager.getUserId()?.let {
+                if (it.isNotBlank()) {
+                    requestLocationPermissions()
+                    startChatService(it)
+                }
             }
 
             setContent {
@@ -68,21 +66,8 @@ class MainActivity : ComponentActivity() {
                     ) {
                         val navController = rememberNavController()
                         val authViewModel: AuthViewModel = viewModel(factory = viewModelFactory)
-                        val authState by authViewModel.state.collectAsState()
-
-                        // Monitor profile state to initialize chat service at the correct time
-                        LaunchedEffect(authState.profile) {
-                            if (authState.profile != null) {
-                                val uid = authState.userId ?: sessionManager.getUserId()
-                                if (!uid.isNullOrEmpty()) {
-                                    startChatService(uid)
-                                }
-                            }
-                        }
-
-                        // Check session again inside composition to decide start destination safely
-                        val isLoggedIn = sessionManager.getAuthToken() != null
-                        val startDestination = if (isLoggedIn) "main" else "login"
+                        
+                        val startDestination = if (sessionManager.getAuthToken() != null) "main" else "login"
 
                         NavHost(navController = navController, startDestination = startDestination) {
                             composable("login") {
@@ -92,9 +77,10 @@ class MainActivity : ComponentActivity() {
                                     onNavigateToVerifyMfa = { navController.navigate("verify_mfa") },
                                     onNavigateToForgotPassword = { navController.navigate("forgot_password") },
                                     onLoginSuccess = {
-                                        authViewModel.fetchProfile()
-                                        requestLocationPermissions()
-                                        // Chat service will be started by the LaunchedEffect above once profile is loaded
+                                        sessionManager.getUserId()?.let { 
+                                            requestLocationPermissions()
+                                            startChatService(it) 
+                                        }
                                         navController.navigate("main") {
                                             popUpTo("login") { inclusive = true }
                                         }
@@ -118,9 +104,10 @@ class MainActivity : ComponentActivity() {
                                 VerifyMfaScreen(
                                     viewModel = authViewModel,
                                     onLoginSuccess = {
-                                        authViewModel.fetchProfile()
-                                        requestLocationPermissions()
-                                        // Chat service will be started by the LaunchedEffect above once profile is loaded
+                                        sessionManager.getUserId()?.let { 
+                                            requestLocationPermissions()
+                                            startChatService(it) 
+                                        }
                                         navController.navigate("main") {
                                             popUpTo("login") { inclusive = true }
                                         }
@@ -158,7 +145,6 @@ class MainActivity : ComponentActivity() {
             }
         } catch (e: Exception) {
             Log.e("MainActivity", "Error in onCreate", e)
-            // Ideally show an error screen or toast, but for now prevent crash loop
         }
     }
 
@@ -201,7 +187,6 @@ class MainActivity : ComponentActivity() {
     
     private fun startChatService(userId: String) {
         try {
-            // Verify userId is not empty or null before starting service
             if (userId.isNotBlank()) {
                 ChatConnectionService.start(this, userId)
             } else {

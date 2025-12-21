@@ -3,27 +3,41 @@ package com.anand.prohands.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.anand.prohands.data.local.RecentChatEntity
-import com.anand.prohands.repository.ChatRepository
+import com.anand.prohands.data.chat.ChatRepository
+import com.anand.prohands.data.chat.ConversationWithParticipants
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
-class ChatListViewModel : ViewModel() {
+class ChatListViewModel(
+    private val repository: ChatRepository,
+    private val currentUserId: String
+) : ViewModel() {
 
-    val recentChats: StateFlow<List<RecentChatEntity>> = ChatRepository.recentChats
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
+    val conversations: StateFlow<List<ConversationWithParticipants>> = repository.getConversations()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    init {
+        repository.currentUserId = currentUserId
+        syncConversations()
+    }
+
+    private fun syncConversations() {
+        viewModelScope.launch {
+            repository.syncData()
+        }
+    }
 }
 
-class ChatListViewModelFactory : ViewModelProvider.Factory {
+class ChatListViewModelFactory(
+    private val repository: ChatRepository,
+    private val currentUserId: String
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(ChatListViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return ChatListViewModel() as T
+            return ChatListViewModel(repository, currentUserId) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }

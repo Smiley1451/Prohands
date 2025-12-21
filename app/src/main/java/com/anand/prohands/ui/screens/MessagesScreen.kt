@@ -1,359 +1,418 @@
 package com.anand.prohands.ui.screens
 
+import android.Manifest
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
-import com.anand.prohands.data.chat.ChatItem
-import com.anand.prohands.data.chat.ChatMessage
+import coil.compose.rememberAsyncImagePainter
+import com.anand.prohands.data.chat.*
 import com.anand.prohands.ui.theme.ProColors
+import com.anand.prohands.viewmodel.ChatItem
+import com.anand.prohands.viewmodel.ChatUiState
 import com.anand.prohands.viewmodel.ChatViewModel
-import com.anand.prohands.viewmodel.ChatViewModelFactory
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
 import java.util.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MessagesScreen(
-    currentUserId: String,
-    recipientId: String,
-    navController: NavController
+    navController: NavController,
+    chatViewModel: ChatViewModel,
+    recipientName: String,
+    recipientAvatar: String?
 ) {
-    // Only instantiate ViewModel if we have valid IDs
-    if (currentUserId.isEmpty() || recipientId.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Invalid user information", color = ProColors.Error)
+    val uiState by chatViewModel.uiState.collectAsState()
+    val recipientPresence by chatViewModel.recipientPresence.collectAsState()
+    val isTyping by chatViewModel.isTyping.collectAsState()
+    val isRecording by chatViewModel.isRecording.collectAsState()
+
+    // --- Permission & Activity Launchers ---
+    val context = LocalContext.current
+
+    val imagePickerLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { chatViewModel.sendMediaMessage(it, MessageType.IMAGE) }
+    }
+    
+    // You need to provide a file URI for the camera to save the image to
+    val cameraLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.TakePicture()) { success: Boolean ->
+        if (success) {
+            // The URI should be retrieved from where it was stored before launching
+            // For demo purposes, we are not fully implementing this part.
         }
-        return
     }
 
-    val viewModel: ChatViewModel = viewModel(
-        factory = ChatViewModelFactory(currentUserId, recipientId)
-    )
-    
-    val chatItems by viewModel.chatItems.collectAsState()
-    val isTyping by viewModel.typing.collectAsState()
-    val isConnected by viewModel.isConnected.collectAsState()
-    val recipientPresence by viewModel.recipientPresence.collectAsState()
-    
-    val listState = rememberLazyListState()
-    var messageText by remember { mutableStateOf("") }
-    
-    // Auto-scroll to bottom when new items arrive
-    LaunchedEffect(chatItems.size) {
-        if (chatItems.isNotEmpty()) {
-            listState.animateScrollToItem(chatItems.size - 1)
+    val recordAudioLauncher = rememberLauncherForActivityResult(contract = ActivityResultContracts.RequestPermission()) { isGranted: Boolean ->
+        if (isGranted) {
+            // voiceRecorder.start()
+            chatViewModel.setRecordingState(true)
         }
     }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = recipientId, // In a real app, resolve this to a name
-                            style = MaterialTheme.typography.titleMedium,
-                            color = ProColors.TextPrimary
-                        )
-                        if (isTyping) {
-                            Text(
-                                text = "typing...",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = ProColors.Primary
-                            )
-                        } else {
-                            val statusText = if (recipientPresence?.online == true) "Online" else "Offline"
-                            val lastSeen = recipientPresence?.lastSeen?.let { formatLastSeen(it) } ?: ""
-                            Text(
-                                text = if (recipientPresence?.online == true) statusText else "$statusText $lastSeen",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (recipientPresence?.online == true) ProColors.Success else ProColors.TextSecondary
-                            )
-                        }
-                    }
+            ChatTopBar(
+                navController = navController, 
+                name = recipientName, 
+                avatarUrl = recipientAvatar, 
+                presenceInfo = when {
+                    isTyping -> "typing..."
+                    recipientPresence?.isOnline == true -> "Online"
+                    else -> "Offline"
                 },
-                navigationIcon = {
-                    IconButton(onClick = { navController.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = ProColors.TextPrimary)
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = ProColors.Surface,
-                    titleContentColor = ProColors.TextPrimary
-                )
+                isOnline = recipientPresence?.isOnline == true
             )
         },
-        bottomBar = {
-            ChatInput(
-                value = messageText,
-                onValueChange = { 
-                    messageText = it
-                    viewModel.sendTyping()
-                },
-                onSend = {
-                    if (messageText.isNotBlank()) {
-                        viewModel.sendMessage(messageText)
-                        messageText = ""
-                    }
-                },
-                enabled = isConnected
-            )
-        }
+        containerColor = ProColors.Background
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
-                .fillMaxSize()
                 .padding(padding)
-                .background(Color(0xFFE5DDD5)) // WhatsApp-like background color
+                .fillMaxSize()
         ) {
-            
-            if (chatItems.isEmpty() && !isConnected) {
-                // Connecting State
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = ProColors.Primary)
-                }
-            } else if (chatItems.isEmpty()) {
-                // Empty State
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "No messages yet.\nSay hello!",
-                        color = Color.Gray,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
-                }
-            }
-            
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(chatItems) { item ->
-                    when (item) {
-                        is ChatItem.Message -> {
-                            MessageBubble(
-                                message = item.message,
-                                isMe = item.message.senderId == currentUserId
-                            )
-                        }
-                        is ChatItem.DateSeparator -> {
-                            DateSeparator(date = item.date)
-                        }
-                    }
-                }
-                if (isTyping) {
-                     item {
-                        TypingIndicator()
-                    }
-                }
-            }
-        }
-    }
-}
+            MessagesList(
+                uiState = uiState,
+                currentUserId = "", // Pass current user ID
+                modifier = Modifier.weight(1f)
+            )
 
-@Composable
-fun DateSeparator(date: String) {
-    Box(
-        modifier = Modifier.fillMaxWidth(),
-        contentAlignment = Alignment.Center
-    ) {
-        Surface(
-            color = Color(0xFFDDF2FA),
-            shape = RoundedCornerShape(8.dp),
-            shadowElevation = 0.dp
-        ) {
-            Text(
-                text = date,
-                style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF555555),
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            MessageInput(
+                onMessageSend = { chatViewModel.sendMessage(it) }, 
+                onTyping = { chatViewModel.onUserTyping() },
+                onAttachFile = { imagePickerLauncher.launch("image/*") },
+                onCameraClick = { /* cameraLauncher.launch(uri) */ },
+                onStartRecording = { recordAudioLauncher.launch(Manifest.permission.RECORD_AUDIO) },
+                onStopRecording = {
+                    //val file = voiceRecorder.stop()
+                    //file?.let { chatViewModel.sendMediaMessage(Uri.fromFile(it), MessageType.VOICE) }
+                    chatViewModel.setRecordingState(false)
+                },
+                isRecording = isRecording
             )
         }
     }
 }
 
 @Composable
-fun MessageBubble(message: ChatMessage, isMe: Boolean) {
-    val bubbleColor = if (isMe) Color(0xFFDCF8C6) else Color.White
-    val align = if (isMe) Alignment.End else Alignment.Start
-    val shape = if (isMe) 
-        RoundedCornerShape(8.dp, 0.dp, 8.dp, 8.dp) 
-    else 
-        RoundedCornerShape(0.dp, 8.dp, 8.dp, 8.dp)
-    
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = align
-    ) {
-        Surface(
-            color = bubbleColor,
-            shape = shape,
-            shadowElevation = 1.dp
-        ) {
-            Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)) {
-                Text(
-                    text = message.content,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Color.Black
+fun ChatTopBar(navController: NavController, name: String, avatarUrl: String?, presenceInfo: String, isOnline: Boolean) {
+    TopAppBar(
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                val painter = if (!avatarUrl.isNullOrEmpty()) {
+                    rememberAsyncImagePainter(avatarUrl)
+                } else {
+                    rememberAsyncImagePainter("https://ui-avatars.com/api/?name=$name&background=random")
+                }
+                Image(
+                    painter = painter,
+                    contentDescription = name,
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(Color.Gray),
+                    contentScale = ContentScale.Crop
                 )
-                Row(
-                    modifier = Modifier.align(Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = formatTime(message.timestamp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.Gray,
-                        fontSize = 11.sp
-                    )
-                    if (isMe) {
-                        StatusIcon(status = message.status)
-                    }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(text = name, fontWeight = FontWeight.Bold, color = Color.White)
+                    Text(text = presenceInfo, fontSize = 12.sp, color = if(isOnline) Color.LightGray else Color.Gray)
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun StatusIcon(status: String) {
-    val icon = when (status) {
-        "SENT" -> Icons.Default.Check
-        "DELIVERED" -> Icons.Default.DoneAll
-        "READ" -> Icons.Default.DoneAll
-        else -> Icons.Default.Check
-    }
-    
-    val tint = if (status == "READ") Color(0xFF34B7F1) else Color.Gray
-    
-    Icon(
-        imageVector = icon,
-        contentDescription = status,
-        modifier = Modifier.size(16.dp),
-        tint = tint
+        },
+        navigationIcon = {
+            IconButton(onClick = { navController.popBackStack() }) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
+            }
+        },
+        colors = TopAppBarDefaults.topAppBarColors(containerColor = ProColors.Primary)
     )
 }
 
 @Composable
-fun ChatInput(
-    value: String,
-    onValueChange: (String) -> Unit,
-    onSend: () -> Unit,
-    enabled: Boolean
-) {
-    Surface(
-        color = Color.White,
-        shadowElevation = 8.dp,
-        modifier = Modifier.imePadding() // Handle keyboard
+fun MessagesList(uiState: ChatUiState, currentUserId: String, modifier: Modifier) {
+    val listState = rememberLazyListState()
+    LaunchedEffect(uiState.items.size) {
+        if (uiState.items.isNotEmpty()) {
+            listState.animateScrollToItem(uiState.items.size - 1)
+        }
+    }
+
+    LazyColumn(
+        state = listState,
+        modifier = modifier.padding(horizontal = 8.dp),
+        contentPadding = PaddingValues(vertical = 12.dp)
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            TextField(
-                value = value,
-                onValueChange = onValueChange,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(Color.White),
-                placeholder = { Text("Message") },
-                colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xFFF0F0F0),
-                    unfocusedContainerColor = Color(0xFFF0F0F0),
-                    focusedIndicatorColor = Color.Transparent,
-                    unfocusedIndicatorColor = Color.Transparent,
-                    disabledIndicatorColor = Color.Transparent
-                ),
-                maxLines = 5,
-                enabled = enabled
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-            FloatingActionButton(
-                onClick = onSend,
-                containerColor = ProColors.Primary,
-                contentColor = Color.White,
-                shape = CircleShape,
-                modifier = Modifier.size(48.dp)
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Send, contentDescription = "Send")
+        items(uiState.items) { item ->
+            when (item) {
+                is ChatItem.DateSeparator -> {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = item.date,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = ProColors.TextSecondary,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(ProColors.Surface.copy(alpha = 0.5f))
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+                is ChatItem.Message -> {
+                    MessageBubble(message = item.message, isFromCurrentUser = item.message.senderId == currentUserId)
+                }
             }
         }
     }
 }
 
 @Composable
-fun TypingIndicator() {
-    Surface(
-        color = Color.White,
-        shape = RoundedCornerShape(0.dp, 8.dp, 8.dp, 8.dp),
-        shadowElevation = 1.dp
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+fun MessageBubble(message: MessageEntity, isFromCurrentUser: Boolean) {
+    val alignment = if (isFromCurrentUser) Alignment.CenterEnd else Alignment.CenterStart
+    val shape = if (isFromCurrentUser) {
+        RoundedCornerShape(topStart = 16.dp, topEnd = 4.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+    } else {
+        RoundedCornerShape(topStart = 4.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 16.dp)
+    }
+    val colors = if (isFromCurrentUser) {
+        BubbleColors(background = ProColors.Primary, text = Color.White)
+    } else {
+        BubbleColors(background = ProColors.Surface, text = ProColors.TextPrimary)
+    }
+
+    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = alignment) {
+        Surface(
+            modifier = Modifier.padding(vertical = 4.dp),
+            shape = shape,
+            color = colors.background,
+            shadowElevation = 1.dp
         ) {
-             // Simple animated dots could be added here
-            Text(
-                text = "...",
-                fontWeight = FontWeight.Bold,
-                color = Color.Gray
-            )
+            Column(modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 2.dp)) {
+                 when (message.type) {
+                    MessageType.TEXT -> {
+                        Text(text = message.content, color = colors.text, fontSize = 16.sp)
+                    }
+                    MessageType.IMAGE -> {
+                        Image(
+                            painter = rememberAsyncImagePainter(message.content),
+                            contentDescription = "Image",
+                            modifier = Modifier.sizeIn(maxHeight = 250.dp).clip(RoundedCornerShape(8.dp)),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+                    MessageType.VOICE -> {
+                        AudioPlayer(uri = Uri.parse(message.content), tint = colors.text)
+                    }
+                    else -> {}
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.End) {
+                    Text(
+                        text = formatMessageTime(message.timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = colors.text.copy(alpha = 0.7f)
+                    )
+                    if (isFromCurrentUser) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        MessageStatusIndicator(status = message.status)
+                    }
+                }
+            }
         }
     }
 }
 
-fun formatTime(isoString: String): String {
-    return try {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-            val instant = Instant.parse(isoString)
-            val formatter = DateTimeFormatter.ofPattern("HH:mm")
-                .withZone(ZoneId.systemDefault())
-            formatter.format(instant)
-        } else {
-             if (isoString.length > 16) isoString.substring(11, 16) else ""
-        }
-    } catch (e: Exception) {
-        ""
+@Composable
+fun AudioPlayer(uri: Uri, tint: Color) {
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 8.dp)) {
+        Icon(imageVector = Icons.Default.PlayArrow, contentDescription = "Play", tint = tint)
+        Slider(value = 0f, onValueChange = {}, modifier = Modifier.weight(1f))
+        Text(text = "0:00", style = MaterialTheme.typography.labelSmall, color = tint)
     }
 }
 
-fun formatLastSeen(isoString: String): String {
-    // Basic implementation
-    return try {
-         "at " + formatTime(isoString)
-    } catch (e: Exception) {
-        ""
+@Composable
+fun MessageStatusIndicator(status: MessageStatus) {
+    val icon = when (status) {
+        MessageStatus.PENDING -> Icons.Default.Schedule
+        MessageStatus.SENT -> Icons.Default.Check
+        MessageStatus.DELIVERED -> Icons.Default.DoneAll
+        MessageStatus.READ -> Icons.Default.DoneAll
+        MessageStatus.FAILED -> Icons.Default.Error
+        MessageStatus.DELETED -> Icons.Default.Delete
+    }
+    val color = when (status) {
+        MessageStatus.READ -> ProColors.Primary
+        MessageStatus.FAILED -> Color.Red
+        else -> Color.White.copy(alpha = 0.7f)
+    }
+    Icon(
+        imageVector = icon, 
+        contentDescription = "Status", 
+        modifier = Modifier.size(16.dp), 
+        tint = color
+    )
+}
+
+@Composable
+fun MessageInput(
+    onMessageSend: (String) -> Unit, 
+    onTyping: () -> Unit,
+    onAttachFile: () -> Unit,
+    onCameraClick: () -> Unit,
+    onStartRecording: () -> Unit,
+    onStopRecording: () -> Unit,
+    isRecording: Boolean
+) {
+    var text by remember { mutableStateOf("") }
+    var showAttachmentMenu by remember { mutableStateOf(false) }
+    val interactionSource = remember { MutableInteractionSource() }
+    val isMicPressed by interactionSource.collectIsPressedAsState()
+
+    LaunchedEffect(isMicPressed) {
+        if (isMicPressed) onStartRecording() else if(isRecording) onStopRecording()
+    }
+
+    Surface(shadowElevation = 4.dp, color = ProColors.Surface) {
+        Column {
+            AnimatedVisibility(visible = showAttachmentMenu) {
+                AttachmentMenu(onAttachFile, onCameraClick)
+            }
+            Row(
+                modifier = Modifier
+                    .padding(8.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                BasicTextField(
+                    value = text,
+                    onValueChange = { 
+                        text = it
+                        onTyping()
+                    },
+                    modifier = Modifier.weight(1f),
+                    cursorBrush = SolidColor(ProColors.Primary),
+                    textStyle = TextStyle(color = ProColors.TextPrimary, fontSize = 16.sp),
+                    decorationBox = {
+                        Row(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(24.dp))
+                                .background(ProColors.Background)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                                .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (text.isEmpty()) {
+                                Text("Message...", color = ProColors.TextSecondary)
+                            }
+                            it()
+                            Spacer(modifier = Modifier.weight(1f))
+                            IconButton(onClick = { showAttachmentMenu = !showAttachmentMenu }) {
+                                Icon(Icons.Default.AttachFile, contentDescription = "Attach", tint = ProColors.TextSecondary)
+                            }
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                
+                val isSendButton = text.isNotBlank()
+
+                 AnimatedVisibility(
+                    visible = isRecording,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Mic, contentDescription = "Recording", tint = Color.Red)
+                    }
+                }
+
+                AnimatedVisibility(
+                    visible = !isRecording,
+                    enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
+                    exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it })
+                ) {
+                     FloatingActionButton(
+                        onClick = { 
+                            if(isSendButton) {
+                                onMessageSend(text)
+                                text = ""
+                            } 
+                        },
+                        interactionSource = if (!isSendButton) interactionSource else remember { MutableInteractionSource() },
+                        modifier = Modifier.size(56.dp),
+                        containerColor = ProColors.Primary,
+                        elevation = FloatingActionButtonDefaults.elevation(0.dp)
+                    ) {
+                        Icon(
+                            imageVector = if(isSendButton) Icons.AutoMirrored.Filled.Send else Icons.Default.Mic,
+                            contentDescription = if(isSendButton) "Send" else "Record", 
+                            tint = Color.White
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
+@Composable
+fun AttachmentMenu(onGalleryClick: () -> Unit, onCameraClick: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        AttachmentMenuItem(icon = Icons.Default.PhotoLibrary, text = "Gallery", onClick = onGalleryClick)
+        AttachmentMenuItem(icon = Icons.Default.CameraAlt, text = "Camera", onClick = onCameraClick)
+    }
+}
+
+@Composable
+fun AttachmentMenuItem(icon: ImageVector, text: String, onClick: () -> Unit) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.clickable(onClick = onClick)) {
+        Icon(imageVector = icon, contentDescription = text, modifier = Modifier.size(48.dp), tint = ProColors.Primary)
+        Text(text, fontSize = 12.sp, color = ProColors.TextSecondary)
+    }
+}
+
+fun formatMessageTime(timestamp: Long): String {
+    return SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date(timestamp))
+}
+
+data class BubbleColors(val background: Color, val text: Color)
